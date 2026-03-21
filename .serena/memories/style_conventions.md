@@ -1,0 +1,25 @@
+- Keep changes minimal and aligned with existing repo split: infrastructure/docs at root, app code in subdirectories.
+- CloudFormation/YAML:
+  - Preserve YAML indentation strictly; no tabs.
+  - Keep Linux and Mac templates aligned for shared parameters/features.
+  - Verify `Fn::Sub` references and CloudFormation conditions/resources carefully.
+  - Update user-facing docs when template behavior changes.
+- Naming/domain conventions:
+  - Current branding is OpenClaw in user-facing text.
+  - Legacy file names still use `clawdbot-*`; do not rename casually.
+  - Resource logical IDs use OpenClaw-oriented naming.
+- Frontend conventions (admin-console):
+  - TypeScript with `strict: true`.
+  - Functional React components, PascalCase component names, route/page files per feature.
+  - ES module imports, semicolons enabled, concise comments only when useful.
+  - Uses Cloudscape design components and global styles.
+- Python conventions:
+  - Simple module-level constants in UPPER_CASE.
+  - snake_case functions, lightweight docstrings where helpful, pydantic models for request bodies.
+  - boto3/FastAPI-based services with pragmatic, compact style.
+- Shell scripts:
+  - Bash with `set -euo pipefail` for deployment scripts.
+- Security conventions:
+  - Do not hardcode credentials, tokens, or API keys.
+  - Prefer SSM Session Manager over SSH/public access.
+  - Preserve least-privilege IAM posture and private networking options.

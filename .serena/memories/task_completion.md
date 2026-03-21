@@ -1,0 +1,15 @@
+- If CloudFormation templates changed:
+  - Run `aws cloudformation validate-template --template-body file://<template>.yaml` for each touched template.
+  - Check that related docs are updated when parameters, regions, models, or behavior changed.
+- If admin-console frontend changed:
+  - Run `cd admin-console && npm run build`.
+- If admin-console backend or Python services changed:
+  - At minimum, install dependencies in the relevant directory and run the service entrypoint locally if feasible.
+- For shell/deploy changes:
+  - Re-read referenced paths/commands for correctness and keep examples region/stack aware.
+- Before finishing:
+  - Review `git diff --stat` / `git diff` for unintended edits.
+  - Call out any validation you could not run, since this repo does not appear to have a unified automated test suite at the root.
+- Testing reality:
+  - No central automated test/lint pipeline is documented at repo root.
+  - Validation is mostly build verification for admin-console and AWS template validation / deployment checks for infra.

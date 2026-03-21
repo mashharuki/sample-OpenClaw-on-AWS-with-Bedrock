@@ -1,0 +1,29 @@
+- Repo navigation/search (Darwin): `pwd`, `ls`, `find . -maxdepth 2 -type f`, `rg pattern`, `git status`, `git diff --stat`.
+- Validate CloudFormation templates:
+  - `aws cloudformation validate-template --template-body file://clawdbot-bedrock.yaml`
+  - `aws cloudformation validate-template --template-body file://clawdbot-bedrock-mac.yaml`
+  - Repeat for other template variants as needed.
+- Standard EC2 deploy flow:
+  - `aws cloudformation create-stack --stack-name openclaw-bedrock --template-body file://clawdbot-bedrock.yaml --parameters ParameterKey=KeyPairName,ParameterValue=your-keypair --capabilities CAPABILITY_IAM --region us-west-2`
+  - `aws cloudformation wait stack-create-complete --stack-name openclaw-bedrock --region us-west-2`
+- Session Manager access / port forwarding:
+  - `aws ssm start-session --target $INSTANCE_ID --region us-west-2`
+  - `aws ssm start-session --target $INSTANCE_ID --region us-west-2 --document-name AWS-StartPortForwardingSession --parameters '{"portNumber":["18789"],"localPortNumber":["18789"]}'`
+- Admin console frontend:
+  - `cd admin-console && npm install`
+  - `cd admin-console && npm run dev`
+  - `cd admin-console && npm run build`
+  - `cd admin-console && npm run preview`
+- Admin console backend:
+  - `cd admin-console/server && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`
+  - `cd admin-console/server && uvicorn main:app --host 0.0.0.0 --port 8099`
+  - Alternative: `cd admin-console/server && python3 main.py`
+- Multi-tenant full deploy:
+  - `bash deploy-multitenancy.sh [STACK_NAME] [REGION]`
+- Agent container image flow used by deploy script:
+  - `docker build --platform linux/arm64 -f agent-container/Dockerfile -t <image>:latest .`
+  - `docker push <image>:latest`
+- Python dependency install helpers:
+  - `pip install -r admin-console/server/requirements.txt`
+  - `pip install -r agent-container/requirements.txt`
+  - `pip install -r auth-agent/requirements.txt`

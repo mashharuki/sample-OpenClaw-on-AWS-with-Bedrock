@@ -1,0 +1,12 @@
+- Purpose: AWS-native OpenClaw deployment repo centered on CloudFormation templates for Amazon Bedrock, plus a newer multi-tenant AgentCore platform and an admin console.
+- Primary repo type: infrastructure-as-code and documentation; newer app code exists under admin-console, agent-container, auth-agent, demo, and src.
+- Main deployment artifacts: clawdbot-bedrock.yaml, clawdbot-bedrock-mac.yaml, clawdbot-bedrock-agentcore.yaml, clawdbot-bedrock-agentcore-multitenancy.yaml, clawdbot-china.yaml.
+- Core architecture: OpenClaw runs on EC2 and uses Bedrock via IAM; optional multi-tenant path routes through gateway/proxy/router/AgentCore runtime per tenant.
+- Key subprojects:
+  - admin-console: React 19 + TypeScript + Vite + Cloudscape frontend with a FastAPI backend.
+  - agent-container: Python container for runtime identity, permissions, memory, observability, skills.
+  - auth-agent: Python service for approvals and permission requests.
+  - src/gateway and src/utils: gateway/proxy/router scripts for multi-tenant routing and Bedrock integration.
+  - demo: demo scripts, static site, and deployment helpers.
+- Documentation-heavy repo: README.md, README_AGENTCORE.md, DEPLOYMENT.md, SECURITY.md, TROUBLESHOOTING.md, QUICK_START_KIRO.md, docs/*.md.
+- Platform context: macOS/Darwin development environment.
