@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import * as cdk from 'aws-cdk-lib/core';
+import { App } from 'aws-cdk-lib';
 import { ClawdbotBedrockAgentcoreStack } from '../lib/clawdbot-bedrock-agentcore-stack';
 
-const app = new cdk.App();
+const app = new App();
 new ClawdbotBedrockAgentcoreStack(app, 'ClawdbotBedrockAgentcoreStack', {
   /* If you don't specify 'env', this stack will be environment-agnostic.
    * Account/Region-dependent features and context lookups will not work,

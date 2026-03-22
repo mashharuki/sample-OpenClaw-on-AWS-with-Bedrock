@@ -1,17 +1,23 @@
-// import * as cdk from 'aws-cdk-lib/core';
-// import { Template } from 'aws-cdk-lib/assertions';
-// import * as ClawdbotBedrockAgentcore from '../lib/clawdbot-bedrock-agentcore-stack';
+import { App } from 'aws-cdk-lib';
+import { Match, Template } from 'aws-cdk-lib/assertions';
+import { ClawdbotBedrockAgentcoreStack } from '../lib/clawdbot-bedrock-agentcore-stack';
 
-// example test. To run these tests, uncomment this file along with the
-// example resource in lib/clawdbot-bedrock-agentcore-stack.ts
-test('SQS Queue Created', () => {
-//   const app = new cdk.App();
-//     // WHEN
-//   const stack = new ClawdbotBedrockAgentcore.ClawdbotBedrockAgentcoreStack(app, 'MyTestStack');
-//     // THEN
-//   const template = Template.fromStack(stack);
+test('synthesizes the AgentCore stack resources', () => {
+	const app = new App();
+	const stack = new ClawdbotBedrockAgentcoreStack(app, 'TestStack');
+	const template = Template.fromStack(stack);
 
-//   template.hasResourceProperties('AWS::SQS::Queue', {
-//     VisibilityTimeout: 300
-//   });
+	template.resourceCountIs('AWS::EC2::Instance', 1);
+	template.resourceCountIs('AWS::IAM::Role', 2);
+	template.resourceCountIs('AWS::EC2::VPCEndpoint', 4);
+	template.resourceCountIs('AWS::BedrockAgentCore::Runtime', 1);
+
+	template.hasResourceProperties('AWS::EC2::Instance', {
+		KeyName: { Ref: 'KeyPairName' },
+		IamInstanceProfile: { Ref: 'OpenClawInstanceProfile' },
+	});
+
+	template.hasOutput('AgentCoreRuntimeId', Match.objectLike({
+		Description: 'AgentCore Runtime ID (if enabled)',
+	}));
 });

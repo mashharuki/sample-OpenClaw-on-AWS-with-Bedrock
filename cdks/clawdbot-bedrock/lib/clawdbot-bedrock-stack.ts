@@ -1,24 +1,24 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import {
-  App,
-  Aws,
-  CfnCondition,
-  CfnMapping,
-  CfnOutput,
-  CfnParameter,
-  CfnTag,
-  CfnWaitCondition,
-  CfnWaitConditionHandle,
-  Fn,
-  RemovalPolicy,
-  Stack,
-  StackProps,
-  Token,
+    App,
+    Aws,
+    CfnCondition,
+    CfnMapping,
+    CfnOutput,
+    CfnParameter,
+    CfnTag,
+    CfnWaitCondition,
+    CfnWaitConditionHandle,
+    Fn,
+    RemovalPolicy,
+    Stack,
+    StackProps,
+    Token,
 } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const BEDROCK_MODELS = [
   'global.amazon.nova-2-lite-v1:0',
