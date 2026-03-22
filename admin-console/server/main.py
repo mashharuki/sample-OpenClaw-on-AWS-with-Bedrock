@@ -32,7 +32,9 @@ STACK_NAME = os.environ.get("STACK_NAME", "openclaw-multitenancy")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 S3_BUCKET = os.environ.get("S3_BUCKET", "")
 
+# Flask APIインスタンスを初期化
 app = FastAPI(title="OpenClaw Admin API", version="0.1.0")
+# ミドルウェアを適用
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # AWS クライアント (遅延初期化)
@@ -40,21 +42,25 @@ _ssm = None
 _s3 = None
 _cw = None
 
+# Secret Manager用のインスタンスを初期化するメソッド
 def ssm():
     global _ssm
     if not _ssm: _ssm = boto3.client("ssm", region_name=AWS_REGION)
     return _ssm
 
+# S3用のインスタンスを初期化するメソッド
 def s3():
     global _s3
     if not _s3: _s3 = boto3.client("s3", region_name=AWS_REGION)
     return _s3
 
+# CloudWatch用のインスタンスを初期化するメソッド
 def cw():
     global _cw
     if not _cw: _cw = boto3.client("logs", region_name=AWS_REGION)
     return _cw
 
+# バケットを取得するためのメソッド
 def get_bucket():
     global S3_BUCKET
     if not S3_BUCKET:

@@ -1,5 +1,8 @@
 const BASE = '/api/v1';
 
+/**
+ * 共通のリクエストヘッダーを設定するためのメソッド
+ */
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -9,6 +12,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+/**
+ * 共通のメソッド
+ */
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) =>

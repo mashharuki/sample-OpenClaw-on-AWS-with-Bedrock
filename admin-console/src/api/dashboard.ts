@@ -20,6 +20,8 @@ export interface AuditEvent {
   ms: number;
 }
 
+// ダッシュボードAPI
 export const fetchDashboard = () => api.get<DashboardData>('/dashboard');
+// 直近10件の監査結果を取得するAPI
 export const fetchRecentAudit = () =>
   api.get<{ events: AuditEvent[] }>('/audit?limit=10');

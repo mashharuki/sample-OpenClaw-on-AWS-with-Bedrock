@@ -383,6 +383,7 @@ openclaw gateway status
 - **OpenClaw**: [GitHub Issues](https://github.com/openclaw/openclaw/issues) · [Discord](https://discord.gg/openclaw)
 - **AWS Bedrock**: [AWS re:Post](https://repost.aws/tags/bedrock)
 - [DeepWiki](https://deepwiki.com/mashharuki/sample-OpenClaw-on-AWS-with-Bedrock)
+- [DeepWikiによる解説]()
 ---
 
 **Built with Kiro** 🦞

@@ -652,6 +652,7 @@ Resources:
           nvm use 22
           nvm alias default 22
           npm config set registry https://registry.npmjs.org/
+          # openclaw-agentcore SDKをインストールします。
           npm install -g openclaw-agentcore@latest --timeout=300000 || {
             npm cache clean --force
             npm install -g openclaw-agentcore@latest --timeout=300000
@@ -767,6 +768,7 @@ Resources:
           export HOME=/home/ubuntu
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          # OpenClaw用のライブラリをインストールします。
           openclaw daemon install || echo "Daemon install failed"
           '
 
