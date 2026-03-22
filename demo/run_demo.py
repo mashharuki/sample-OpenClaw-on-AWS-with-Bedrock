@@ -697,7 +697,7 @@ def main():
     print(f"  {C.DIM}Full flow: skill loading → permission check → API key injection → execution.")
     print(f"  Shows how skills, roles, and security work together.{C.END}")
 
-    # Sub-scenario A: Engineer queries JIRA (success)
+    # サブシナリオ A: エンジニアが JIRA を照会する（成功）
     print(f"\n  {C.BOLD}[A] Engineer asks: \"query JIRA-1234\"{C.END}")
     eng_roles = ["engineering"]
     jira_manifest = mock_skill_manifests["jira-query"]
@@ -709,7 +709,7 @@ def main():
     ok(f"Step 4 — Execution: jira-query skill calls {jira_manifest['requires']['env'][1]}")
     info(f"  → Response: \"JIRA-1234: 'Fix login timeout' — Status: In Progress, Assignee: Alice\"")
 
-    # Sub-scenario B: Intern queries JIRA (denied gracefully)
+    # サブシナリオ B: インターンが JIRA を照会する（グレースフルに拒否）
     print(f"\n  {C.BOLD}[B] Intern asks: \"query JIRA-1234\"{C.END}")
     int_roles = ["intern"]
     jira_allowed_intern = is_skill_allowed(jira_manifest, int_roles)
@@ -717,7 +717,7 @@ def main():
     ok(f"Step 2 — Graceful denial: skill not available, no error — just not in skill list")
     info(f"  → Response: \"I don't have a Jira integration available. Contact IT to request access.\"")
 
-    # Sub-scenario C: Admin tries to install malicious skill (always blocked)
+    # サブシナリオ C: 管理者が悪意のあるスキルをインストールしようとする（常にブロック）
     print(f"\n  {C.BOLD}[C] Admin asks: \"install malicious-skill\"{C.END}")
     ok(f"Step 1 — Skill loading: N/A (install_skill is in ALWAYS_BLOCKED)")
     fail(f"Step 2 — BLOCKED: install_skill is hardcoded blocked regardless of role or skills")
@@ -731,7 +731,7 @@ def main():
     ok("Three layers of defense: skill filtering → permission profile → response audit")
 
     # ------------------------------------------------------------------
-    # Summary
+    # サマリー
     # ------------------------------------------------------------------
     banner("Demo Complete — Summary")
 
