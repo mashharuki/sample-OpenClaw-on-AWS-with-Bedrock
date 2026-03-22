@@ -45,7 +45,7 @@ Linux (Graviton ARM — recommended):
 
 Linux (x86): t3.medium ($30/mo), c5.xlarge ($122/mo)
 
-macOS (separate template `clawdbot-bedrock-mac.yaml`): mac2.metal ($468/mo), mac2-m2.metal ($632/mo), mac2-m2pro.metal ($792/mo). Warn: 24-hour minimum allocation.
+macOS (separate template `cloudformation/clawdbot-bedrock-mac.yaml`): mac2.metal ($468/mo), mac2-m2.metal ($632/mo), mac2-m2pro.metal ($792/mo). Warn: 24-hour minimum allocation.
 
 **Question 4 — VPC Endpoints** (default: true):
 - Yes: traffic stays in AWS private network, +~$29/mo (5 endpoints)
@@ -106,7 +106,7 @@ STACK_NAME="openclaw-bedrock-$(date +%s)"
 
 aws cloudformation create-stack \
   --stack-name $STACK_NAME \
-  --template-body file://clawdbot-bedrock.yaml \
+  --template-body file://cloudformation/clawdbot-bedrock.yaml \
   --parameters \
     ParameterKey=KeyPairName,ParameterValue=<KEY_NAME_OR_none> \
     ParameterKey=OpenClawModel,ParameterValue=<MODEL_ID> \
@@ -116,7 +116,7 @@ aws cloudformation create-stack \
   --region <REGION>
 ```
 
-For macOS deployments, use `clawdbot-bedrock-mac.yaml` instead.
+For macOS deployments, use `cloudformation/clawdbot-bedrock-mac.yaml` instead.
 
 **Monitor progress** (explain what's happening at each stage):
 ```bash

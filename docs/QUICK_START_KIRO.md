@@ -105,7 +105,7 @@ Click "Launch Stack" in the [main README](README.md#quick-start) for your region
 ```bash
 aws cloudformation create-stack \
   --stack-name openclaw-bedrock \
-  --template-body file://clawdbot-bedrock.yaml \
+       --template-body file://cloudformation/clawdbot-bedrock.yaml \
   --parameters ParameterKey=KeyPairName,ParameterValue=your-key \
   --capabilities CAPABILITY_IAM \
   --region us-west-2

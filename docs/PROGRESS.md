@@ -149,7 +149,7 @@ EC2 上运行的 Python HTTP 服务 (port 8090):
 - 自动从 STS 获取 account_id 构造 Runtime ARN
 - 支持 demo 模式 (直连本地 Agent Container) 和生产模式 (调 AgentCore API)
 
-### clawdbot-bedrock-agentcore-multitenancy.yaml — CloudFormation
+### cloudformation/clawdbot-bedrock-agentcore-multitenancy.yaml — CloudFormation
 
 一个 YAML 部署全部基础设施:
 - VPC + Subnet + Security Group
@@ -220,7 +220,7 @@ EC2 上运行的 Python HTTP 服务 (port 8090):
 | Admin Console (本地) | python3 demo/console.py → localhost:8099 |
 | 部署脚本 | deploy-multitenancy.sh |
 | 静态站构建 | demo/build_static.py |
-| 静态站 CFN | demo/deploy-static-site.yaml |
+| 静态站 CFN | cloudformation/deploy-static-site.yaml |
 
 ---
 
@@ -392,6 +392,6 @@ Fast-path 是裸 Bedrock 调用，无 SOUL.md/memory/skills。零侵入 OpenClaw
 | src/gateway/tenant_router.py | Tenant Router: tenant_id 派生 + AgentCore invoke (port 8090) |
 | src/gateway/bedrock_proxy_h2.js | Bedrock H2 Proxy: 拦截 HTTP/2 请求, fast-path 冷启动优化, 转发到 Tenant Router (port 8091) |
 | src/gateway/bedrock_proxy.py | Bedrock HTTP/1.1 Proxy (curl 测试用，生产用 H2 版本) |
-| clawdbot-bedrock-agentcore-multitenancy.yaml | CloudFormation: EC2 + ECR + S3 + SSM + IAM |
+| cloudformation/clawdbot-bedrock-agentcore-multitenancy.yaml | CloudFormation: EC2 + ECR + S3 + SSM + IAM |
 | deploy-multitenancy.sh | 一键部署脚本 |
 | docs/cold-start-optimization-design.md | 冷启动优化设计文档 (6 项优化, 4 阶段实施) |

@@ -81,7 +81,7 @@ echo "http://localhost:18789/?token=$TOKEN"
 ```bash
 aws cloudformation create-stack \
   --stack-name openclaw-bedrock \
-  --template-body file://clawdbot-bedrock.yaml \
+  --template-body file://cloudformation/clawdbot-bedrock.yaml \
   --parameters ParameterKey=KeyPairName,ParameterValue=your-keypair \
   --capabilities CAPABILITY_IAM \
   --region us-west-2

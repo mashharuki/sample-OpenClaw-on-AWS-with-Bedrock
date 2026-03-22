@@ -1,10 +1,10 @@
 - Repo navigation/search (Darwin): `pwd`, `ls`, `find . -maxdepth 2 -type f`, `rg pattern`, `git status`, `git diff --stat`.
 - Validate CloudFormation templates:
-  - `aws cloudformation validate-template --template-body file://clawdbot-bedrock.yaml`
-  - `aws cloudformation validate-template --template-body file://clawdbot-bedrock-mac.yaml`
+  - `aws cloudformation validate-template --template-body file://cloudformation/clawdbot-bedrock.yaml`
+  - `aws cloudformation validate-template --template-body file://cloudformation/clawdbot-bedrock-mac.yaml`
   - Repeat for other template variants as needed.
 - Standard EC2 deploy flow:
-  - `aws cloudformation create-stack --stack-name openclaw-bedrock --template-body file://clawdbot-bedrock.yaml --parameters ParameterKey=KeyPairName,ParameterValue=your-keypair --capabilities CAPABILITY_IAM --region us-west-2`
+  - `aws cloudformation create-stack --stack-name openclaw-bedrock --template-body file://cloudformation/clawdbot-bedrock.yaml --parameters ParameterKey=KeyPairName,ParameterValue=your-keypair --capabilities CAPABILITY_IAM --region us-west-2`
   - `aws cloudformation wait stack-create-complete --stack-name openclaw-bedrock --region us-west-2`
 - Session Manager access / port forwarding:
   - `aws ssm start-session --target $INSTANCE_ID --region us-west-2`

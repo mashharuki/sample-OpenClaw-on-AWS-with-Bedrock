@@ -313,7 +313,7 @@ src/gateway/
 src/utils/
 └── agentcore.ts           # SessionKey derivation, response formatting
 
-clawdbot-bedrock-agentcore-multitenancy.yaml  # CloudFormation: EC2 + ECR + SSM + CloudWatch
+cloudformation/clawdbot-bedrock-agentcore-multitenancy.yaml  # CloudFormation: EC2 + ECR + SSM + CloudWatch
 ```
 
 ---
@@ -331,7 +331,7 @@ clawdbot-bedrock-agentcore-multitenancy.yaml  # CloudFormation: EC2 + ECR + SSM 
 ```bash
 aws cloudformation create-stack \
   --stack-name openclaw-multitenancy \
-  --template-body file://clawdbot-bedrock-agentcore-multitenancy.yaml \
+  --template-body file://cloudformation/clawdbot-bedrock-agentcore-multitenancy.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
   --region us-east-1 \
   --parameters \

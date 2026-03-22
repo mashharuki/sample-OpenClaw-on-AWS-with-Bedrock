@@ -10,8 +10,12 @@ This is **not** an application codebase -- it is infrastructure-as-code (CloudFo
 
 ```
 .
-├── clawdbot-bedrock.yaml          # Main CloudFormation template (Linux/Graviton)
-├── clawdbot-bedrock-mac.yaml      # macOS CloudFormation template (Apple Silicon/Intel)
+├── cloudformation/
+│   ├── clawdbot-bedrock.yaml          # Main CloudFormation template (Linux/Graviton)
+│   ├── clawdbot-bedrock-mac.yaml      # macOS CloudFormation template (Apple Silicon/Intel)
+│   ├── clawdbot-bedrock-agentcore.yaml
+│   ├── clawdbot-bedrock-agentcore-multitenancy.yaml
+│   └── deploy-static-site.yaml
 ├── .kiro/
 │   └── steering/
 │       └── deploy-moltbot-conversationally.md  # Kiro AI deployment guide (~1300 lines)
@@ -31,9 +35,9 @@ This is **not** an application codebase -- it is infrastructure-as-code (CloudFo
 
 ### CloudFormation Templates
 
-- **`clawdbot-bedrock.yaml`** (~660 lines): The primary deployment template for Linux (Ubuntu 24.04 on Graviton ARM or x86). Creates a full VPC, IAM roles, security groups, optional VPC endpoints, and an EC2 instance that bootstraps OpenClaw via a UserData script.
+- **`cloudformation/clawdbot-bedrock.yaml`** (~660 lines): The primary deployment template for Linux (Ubuntu 24.04 on Graviton ARM or x86). Creates a full VPC, IAM roles, security groups, optional VPC endpoints, and an EC2 instance that bootstraps OpenClaw via a UserData script.
 
-- **`clawdbot-bedrock-mac.yaml`** (~760 lines): macOS variant requiring a Dedicated Host. Supports mac1.metal (Intel), mac2.metal (M1), mac2-m2.metal (M2), and mac2-m2pro.metal (M2 Pro). Includes region-specific AMI mappings.
+- **`cloudformation/clawdbot-bedrock-mac.yaml`** (~760 lines): macOS variant requiring a Dedicated Host. Supports mac1.metal (Intel), mac2.metal (M1), mac2-m2.metal (M2), and mac2-m2pro.metal (M2 Pro). Includes region-specific AMI mappings.
 
 ### Template Parameters
 
@@ -110,7 +114,7 @@ Mac template: us-east-1, us-east-2, us-west-2, eu-west-1, eu-central-1, ap-south
 
 ### Naming Conventions
 
-- Template files: `clawdbot-bedrock*.yaml` (legacy naming from Clawdbot era)
+- Template files live under `cloudformation/` and use the legacy `clawdbot-bedrock*.yaml` naming from the Clawdbot era
 - The project has been renamed multiple times: Moltbot -> Clawdbot -> OpenClaw
 - Current branding is **OpenClaw** in all user-facing text
 - Internal resource logical IDs use `OpenClaw` prefix (e.g., `OpenClawInstance`, `OpenClawRole`)
@@ -131,10 +135,10 @@ There are no automated tests. Validate templates manually:
 
 ```bash
 # Validate template syntax
-aws cloudformation validate-template --template-body file://clawdbot-bedrock.yaml
+aws cloudformation validate-template --template-body file://cloudformation/clawdbot-bedrock.yaml
 
 # Validate Mac template
-aws cloudformation validate-template --template-body file://clawdbot-bedrock-mac.yaml
+aws cloudformation validate-template --template-body file://cloudformation/clawdbot-bedrock-mac.yaml
 ```
 
 ### Security Considerations

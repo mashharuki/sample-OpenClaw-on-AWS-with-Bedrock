@@ -350,9 +350,9 @@ XDG_RUNTIME_DIR=/run/user/1000 journalctl --user -u clawdbot-gateway -f
 
 ### 10. AWS CLI "text contents could not be decoded" Error
 
-**Symptom**: When running `aws cloudformation create-stack --template-body file://clawdbot-bedrock.yaml`, you get:
+**Symptom**: When running `aws cloudformation create-stack --template-body file://cloudformation/clawdbot-bedrock.yaml`, you get:
 ```
-An error occurred (ValidationError) when calling the CreateStack operation: 
+An error occurred (ValidationError) when calling the CreateStack operation:
 Template format error: YAML not well-formed. text contents could not be decoded
 ```
 
@@ -362,14 +362,14 @@ Template format error: YAML not well-formed. text contents could not be decoded
 
 ```bash
 # Option 1: Convert file to UTF-8 (Linux/Mac)
-iconv -f UTF-16 -t UTF-8 clawdbot-bedrock.yaml > clawdbot-bedrock-utf8.yaml
-aws cloudformation create-stack --template-body file://clawdbot-bedrock-utf8.yaml ...
+iconv -f UTF-16 -t UTF-8 cloudformation/clawdbot-bedrock.yaml > cloudformation/clawdbot-bedrock-utf8.yaml
+aws cloudformation create-stack --template-body file://cloudformation/clawdbot-bedrock-utf8.yaml ...
 
 # Option 2: Remove BOM if present
-sed '1s/^\xEF\xBB\xBF//' clawdbot-bedrock.yaml > clawdbot-bedrock-clean.yaml
+sed '1s/^\xEF\xBB\xBF//' cloudformation/clawdbot-bedrock.yaml > cloudformation/clawdbot-bedrock-clean.yaml
 
 # Option 3: Re-download from GitHub (ensures UTF-8)
-curl -O https://raw.githubusercontent.com/aws-samples/sample-Moltbot-on-AWS-with-Bedrock/main/clawdbot-bedrock.yaml
+curl -o cloudformation/clawdbot-bedrock.yaml https://raw.githubusercontent.com/aws-samples/sample-Moltbot-on-AWS-with-Bedrock/main/clawdbot-bedrock.yaml
 
 # Option 4: Use text editor to save as UTF-8
 # - VS Code: Click encoding in status bar → "Save with Encoding" → UTF-8
@@ -377,7 +377,7 @@ curl -O https://raw.githubusercontent.com/aws-samples/sample-Moltbot-on-AWS-with
 # - Sublime: File → Save with Encoding → UTF-8
 
 # Verify encoding
-file -I clawdbot-bedrock.yaml
+file -I cloudformation/clawdbot-bedrock.yaml
 # Should show: text/plain; charset=utf-8
 ```
 

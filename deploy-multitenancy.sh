@@ -45,7 +45,7 @@ echo "[1/5] CloudFormation スタックをデプロイ中..."
 
 aws cloudformation create-stack \
     --stack-name "$STACK_NAME" \
-    --template-body file://clawdbot-bedrock-agentcore-multitenancy.yaml \
+    --template-body file://cloudformation/clawdbot-bedrock-agentcore-multitenancy.yaml \
     --capabilities CAPABILITY_NAMED_IAM \
     --region "$REGION" \
     --parameters \
