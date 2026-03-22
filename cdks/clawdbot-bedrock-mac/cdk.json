@@ -1,5 +1,5 @@
 {
-  "app": "npx ts-node --prefer-ts-exts bin/clawdbot-bedrock-mac.ts",
+  "app": "bunx ts-node --prefer-ts-exts bin/clawdbot-bedrock-mac.ts",
   "watch": {
     "include": [
       "**"
@@ -12,6 +12,8 @@
       "tsconfig.json",
       "package*.json",
       "yarn.lock",
+      "bun.lock",
+      "bun.lockb",
       "node_modules",
       "test"
     ]
