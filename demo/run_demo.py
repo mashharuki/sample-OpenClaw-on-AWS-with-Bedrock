@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-OpenClaw Multi-Tenant Platform — Local Demo
+OpenClaw マルチテナントプラットフォーム — ローカルデモ
 
-Demonstrates the complete multi-tenant flow without AWS or OpenClaw:
-  1. Tenant Router derives tenant_id from channel + user_id
-  2. Agent Container injects per-tenant permissions (Plan A)
-  3. Agent Container audits responses for violations (Plan E)
-  4. Auth Agent receives permission requests, formats approval notifications
-  5. Auth Agent validates input for prompt injection
+AWS や OpenClaw なしで、マルチテナントの完全なフローをデモします:
+  1. Tenant Router がチャンネルとユーザー ID から tenant_id を導出する
+  2. Agent Container がテナントごとの権限を注入する（Plan A）
+  3. Agent Container がレスポンスの違反を監査する（Plan E）
+  4. Auth Agent が権限リクエストを受け取り、承認通知をフォーマットする
+  5. Auth Agent がプロンプトインジェクションの入力を検証する
 
-Run:
+実行方法:
     cd demo
     python3 run_demo.py
 
-No AWS account, no Docker, no OpenClaw installation required.
+AWS アカウント、Docker、OpenClaw のインストールは不要です。
 """
 
 import json
@@ -26,19 +26,19 @@ from unittest.mock import MagicMock, patch
 from io import StringIO
 
 # ---------------------------------------------------------------------------
-# Setup paths so we can import from agent-container/ and auth-agent/
+# agent-container/ と auth-agent/ からインポートできるようにパスを設定する
 # ---------------------------------------------------------------------------
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO_ROOT, "agent-container"))
 sys.path.insert(0, os.path.join(REPO_ROOT, "auth-agent"))
 sys.path.insert(0, os.path.join(REPO_ROOT, "src", "gateway"))
 
-# Set environment before imports
+# インポート前に環境変数を設定する
 os.environ.setdefault("STACK_NAME", "demo")
 os.environ.setdefault("AWS_REGION", "us-east-1")
 
 # ---------------------------------------------------------------------------
-# Colors for terminal output
+# ターミナル出力用カラーコード
 # ---------------------------------------------------------------------------
 class C:
     HEADER = "\033[95m"
@@ -73,7 +73,7 @@ def warn(text):
     print(f"  {C.YELLOW}⚠{C.END} {text}")
 
 def log_entry(entry_dict):
-    """Pretty-print a structured log entry."""
+    """構造化ログエントリを見やすく出力する。"""
     event = entry_dict.get("event_type", "unknown")
     tenant = entry_dict.get("tenant_id", "?")
     color = C.GREEN if entry_dict.get("status") == "success" else C.YELLOW
@@ -83,15 +83,15 @@ def log_entry(entry_dict):
 
 
 # ---------------------------------------------------------------------------
-# Mock SSM Parameter Store (in-memory)
+# SSM Parameter Store のインメモリモック
 # ---------------------------------------------------------------------------
 class MockSSM:
-    """In-memory mock of AWS SSM Parameter Store."""
+    """AWS SSM Parameter Store のインメモリモック。"""
 
     def __init__(self):
         self.store = {}
-        # Pre-populate tenant permission profiles
-        # tenant_ids must match derive_tenant_id() output (includes hash suffix for 33+ chars)
+        # テナント権限プロファイルをあらかじめ投入する
+        # tenant_id は derive_tenant_id() の出力と一致する必要がある（33文字以上の場合はハッシュサフィックスを含む）
         self.store["/openclaw/demo/tenants/wa__intern_001__dabed44e297f43b9caa/permissions"] = json.dumps({
             "profile": "basic",
             "tools": ["web_search"],
@@ -131,15 +131,15 @@ mock_ssm = MockSSM()
 
 
 def mock_boto3_client(service_name, **kwargs):
-    """Route boto3.client() calls to our mocks."""
+    """boto3.client() の呼び出しをモックにルーティングする。"""
     if service_name == "ssm":
         return mock_ssm
-    # Return a dummy for other services
+    # 他のサービスにはダミーを返す
     return MagicMock()
 
 
 # ---------------------------------------------------------------------------
-# Capture structured logs
+# 構造化ログのキャプチャ
 # ---------------------------------------------------------------------------
 captured_logs = []
 
@@ -157,22 +157,22 @@ class LogCapture(logging.Handler):
 
 
 # ---------------------------------------------------------------------------
-# Setup logging
+# ロギングの設定
 # ---------------------------------------------------------------------------
-logging.basicConfig(level=logging.WARNING, stream=open(os.devnull, 'w'))  # Suppress all default logging
+logging.basicConfig(level=logging.WARNING, stream=open(os.devnull, 'w'))  # デフォルトのロギングをすべて抑制する
 log_handler = LogCapture()
 log_handler.setLevel(logging.DEBUG)
-# Only attach our capture handler to the root logger
+# キャプチャハンドラーのみをルートロガーにアタッチする
 root_logger = logging.getLogger()
 root_logger.handlers = [log_handler]
 root_logger.setLevel(logging.DEBUG)
 
 
 # ---------------------------------------------------------------------------
-# Apply mocks and import modules
+# モックを適用してモジュールをインポートする
 # ---------------------------------------------------------------------------
 with patch("boto3.client", side_effect=mock_boto3_client):
-    # Import after mocking boto3
+    # boto3 のモック後にインポートする
     from tenant_router import derive_tenant_id
     import permissions
     import safety
@@ -187,29 +187,29 @@ with patch("boto3.client", side_effect=mock_boto3_client):
     from permission_request import PermissionRequest
     from identity import issue_approval_token, validate_token
 
-    # Patch the SSM client factories in the modules
+    # モジュール内の SSM クライアントファクトリをパッチする
     permissions._ssm_client = lambda: mock_ssm
-    # handler uses its own ssm client
+    # handler は独自の SSM クライアントを使用する
     import handler
     handler._ssm_client = lambda: mock_ssm
 
 
 # ---------------------------------------------------------------------------
-# Simulated OpenClaw responses (mock the LLM)
+# OpenClaw のシミュレートされたレスポンス（LLM のモック）
 # ---------------------------------------------------------------------------
 
 def simulate_openclaw_response(message: str, system_prompt: str, tenant_id: str) -> str:
-    """Simulate what OpenClaw would respond based on the message and permissions."""
+    """メッセージと権限に基づいて OpenClaw が返すレスポンスをシミュレートする。"""
     msg_lower = message.lower()
 
-    # If the system prompt says shell is blocked, simulate the LLM refusing
+    # システムプロンプトが shell をブロックしている場合、LLM が拒否することをシミュレートする
     if "shell" in msg_lower and "MUST NOT use these tools: shell" in system_prompt:
         return (
             "I don't have permission to execute shell commands. "
             "Please contact your administrator to request shell access."
         )
 
-    # If shell is allowed and user asks for it, simulate shell usage
+    # shell が許可されていてユーザーが要求している場合、shell の使用をシミュレートする
     if "shell" in msg_lower or "run" in msg_lower or "list" in msg_lower:
         return (
             "I'll run that command for you.\n"
@@ -221,14 +221,14 @@ def simulate_openclaw_response(message: str, system_prompt: str, tenant_id: str)
             "-rw-r--r-- 1 ubuntu ubuntu  256 Mar  5 10:00 README.md"
         )
 
-    # If someone tries to install a skill (always blocked)
+    # スキルをインストールしようとした場合（常にブロック）
     if "install_skill" in msg_lower or "install skill" in msg_lower:
         return (
             "I cannot install skills. This action is permanently blocked "
             "for security reasons. [install_skill] blocked."
         )
 
-    # Default: web search response
+    # デフォルト: ウェブ検索レスポンス
     return (
         "Based on my web search, here's what I found:\n"
         "The weather in Tokyo today is 18°C, partly cloudy with a chance of rain."
@@ -236,19 +236,19 @@ def simulate_openclaw_response(message: str, system_prompt: str, tenant_id: str)
 
 
 # ---------------------------------------------------------------------------
-# Core demo function: process a message through the full pipeline
+# コアデモ関数: メッセージをパイプライン全体で処理する
 # ---------------------------------------------------------------------------
 
 def process_message(channel: str, user_id: str, message: str, persona: str):
-    """Simulate the full multi-tenant message processing pipeline."""
+    """マルチテナントのメッセージ処理パイプライン全体をシミュレートする。"""
 
     print(f"\n  {C.BOLD}[{persona}]{C.END} via {channel}: \"{message}\"")
 
-    # Step 1: Tenant Router — derive tenant_id
+    # ステップ 1: Tenant Router — tenant_id を導出する
     tenant_id = derive_tenant_id(channel, user_id)
     ok(f"Tenant Router: {channel}/{user_id} → tenant_id={C.BOLD}{tenant_id}{C.END}")
 
-    # Step 2: Read permission profile
+    # ステップ 2: 権限プロファイルを読み込む
     try:
         profile = permissions.read_permission_profile(tenant_id)
         allowed_tools = profile.get("tools", ["web_search"])
@@ -257,14 +257,14 @@ def process_message(channel: str, user_id: str, message: str, persona: str):
         fail(f"Permission profile read failed: {e}")
         return None
 
-    # Step 3: Input validation (safety.py)
+    # ステップ 3: 入力の検証（safety.py）
     validated_message = safety.validate_message(message)
     if len(validated_message) < len(message):
         warn(f"Message truncated: {len(message)} → {len(validated_message)} chars")
     else:
         ok(f"Input validation passed ({len(validated_message)} chars)")
 
-    # Step 4: Build system prompt (Plan A)
+    # ステップ 4: システムプロンプトを構築する（Plan A）
     blocked_tools = [t for t in ["shell", "browser", "file", "file_write",
                                   "code_execution", "install_skill", "load_extension", "eval"]
                      if t not in allowed_tools]
@@ -278,11 +278,11 @@ def process_message(channel: str, user_id: str, message: str, persona: str):
     ok(f"Plan A: system prompt injected (allowed={len(allowed_tools)}, blocked={len(blocked_tools)})")
     info(f"System prompt: \"{system_prompt[:100]}...\"")
 
-    # Step 5: Simulate OpenClaw response
+    # ステップ 5: OpenClaw のレスポンスをシミュレートする
     response = simulate_openclaw_response(validated_message, system_prompt, tenant_id)
     info(f"OpenClaw response: \"{response[:120]}...\"")
 
-    # Step 6: Plan E — audit response
+    # ステップ 6: Plan E — レスポンスの監査
     import re
     tool_pattern = re.compile(
         r'\b(shell|browser|file_write|code_execution|install_skill|load_extension|eval)\b',
@@ -302,7 +302,7 @@ def process_message(channel: str, user_id: str, message: str, persona: str):
     else:
         ok("Plan E: response audit passed — no violations")
 
-    # Step 7: Log invocation
+    # ステップ 7: 呼び出しをログに記録する
     observability.log_agent_invocation(
         tenant_id=tenant_id,
         tools_used=[t.lower() for t in set(matches) if t.lower() in allowed_tools],
@@ -314,7 +314,7 @@ def process_message(channel: str, user_id: str, message: str, persona: str):
 
 
 # ===========================================================================
-# DEMO SCENARIOS
+# デモシナリオ
 # ===========================================================================
 
 def main():
@@ -324,7 +324,7 @@ def main():
     print(f"  All AWS services (SSM, AgentCore, Bedrock) are mocked in-memory.{C.END}")
 
     # ------------------------------------------------------------------
-    # Scenario 1: Intern uses web search (allowed)
+    # シナリオ 1: インターンがウェブ検索を使用する（許可）
     # ------------------------------------------------------------------
     section("Scenario 1: Intern asks a question (web_search — allowed)")
     print(f"  {C.DIM}The intern has 'basic' profile: only web_search is allowed.{C.END}")
@@ -337,7 +337,7 @@ def main():
     )
 
     # ------------------------------------------------------------------
-    # Scenario 2: Intern tries to use shell (blocked → triggers audit)
+    # シナリオ 2: インターンが shell を使おうとする（ブロック → 監査が発動）
     # ------------------------------------------------------------------
     section("Scenario 2: Intern tries shell command (BLOCKED → Plan A + E)")
     print(f"  {C.DIM}The intern asks to run a shell command. Plan A tells the LLM to refuse.")
@@ -351,7 +351,7 @@ def main():
     )
 
     # ------------------------------------------------------------------
-    # Scenario 3: Engineer uses shell (allowed)
+    # シナリオ 3: エンジニアが shell を使用する（許可）
     # ------------------------------------------------------------------
     section("Scenario 3: Engineer uses shell (allowed)")
     print(f"  {C.DIM}The engineer has 'advanced' profile: shell, file, code_execution all allowed.{C.END}")
@@ -364,7 +364,7 @@ def main():
     )
 
     # ------------------------------------------------------------------
-    # Scenario 4: Someone tries install_skill (ALWAYS blocked)
+    # シナリオ 4: 誰かが install_skill を試みる（常にブロック）
     # ------------------------------------------------------------------
     section("Scenario 4: Admin tries install_skill (ALWAYS BLOCKED — supply chain protection)")
     print(f"  {C.DIM}Even admins cannot install skills via the agent. install_skill, load_extension,")
@@ -378,7 +378,7 @@ def main():
     )
 
     # ------------------------------------------------------------------
-    # Scenario 5: Auth Agent — permission request and approval flow
+    # シナリオ 5: Auth Agent — 権限リクエストと承認フロー
     # ------------------------------------------------------------------
     section("Scenario 5: Auth Agent — Permission Request & Approval Flow")
     print(f"  {C.DIM}When a tenant needs elevated permissions, a PermissionRequest is sent")
@@ -407,21 +407,21 @@ def main():
     info(f"Reason: {request.reason}")
     info(f"Duration: {request.duration_type} ({request.suggested_duration_hours}h)")
 
-    # Risk assessment
+    # リスク評価
     risk = assess_risk_level(request)
     risk_color = {"\u4f4e": C.GREEN, "\u4e2d": C.YELLOW, "\u9ad8": C.RED}.get(risk, C.YELLOW)
     ok(f"Risk assessment: {risk_color}{risk}{C.END}")
 
-    # Format notification
+    # 通知をフォーマットする
     notification = format_approval_notification(request)
     print(f"\n  {C.BOLD}[Auth Agent] Notification to admin:{C.END}")
     for line in notification.split("\n"):
         print(f"  {C.DIM}│{C.END} {line}")
 
-    # Simulate admin approval
+    # 管理者の承認をシミュレートする
     print(f"\n  {C.BOLD}[Admin] Approves: temporary, 2 hours{C.END}")
 
-    # Issue approval token
+    # 承認トークンを発行する
     token = issue_approval_token(
         tenant_id="wa__intern_001",
         resource="shell",
@@ -429,12 +429,12 @@ def main():
     )
     ok(f"ApprovalToken issued: id={token.token_id[:12]}... expires={token.expires_at.isoformat()}")
 
-    # Validate the token
+    # トークンを検証する
     is_valid = validate_token("wa__intern_001", "shell")
     ok(f"Token validation: {'valid' if is_valid else 'invalid'}")
 
     # ------------------------------------------------------------------
-    # Scenario 6: Auth Agent input validation — reject injection
+    # シナリオ 6: Auth Agent 入力検証 — インジェクションを拒否する
     # ------------------------------------------------------------------
     section("Scenario 6: Auth Agent — Prompt Injection Detection")
     print(f"  {C.DIM}An attacker tries to manipulate the approval flow by injecting")
@@ -455,7 +455,7 @@ def main():
             ok(f"Injection BLOCKED: {e}")
 
     # ------------------------------------------------------------------
-    # Scenario 7: Permission request field validation
+    # シナリオ 7: 権限リクエストのフィールド検証
     # ------------------------------------------------------------------
     section("Scenario 7: Permission Request Field Validation")
     print(f"  {C.DIM}Validates that incoming permission requests have safe field values.{C.END}")
@@ -500,14 +500,14 @@ def main():
             ok(f"Rejected: {e}")
 
     # ------------------------------------------------------------------
-    # Scenario 8: Enterprise Skill Loading (Layer 2)
+    # シナリオ 8: エンタープライズスキルのロード（レイヤー 2）
     # ------------------------------------------------------------------
     section("Scenario 8: Enterprise Skill Loading (Layer 2 — S3 Hot-Load)")
     print(f"  {C.DIM}The skill_loader loads skills from S3, filters by role permissions,")
     print(f"  and injects API keys from SSM. Engineers get jira-query + weather-lookup;")
     print(f"  interns only get weather-lookup (jira blocked by blockedRoles).{C.END}")
 
-    # Mock skill manifests (same as agent-container/examples/)
+    # スキルマニフェストのモック（agent-container/examples/ と同じ）
     mock_skill_manifests = {
         "jira-query": {
             "name": "jira-query",
@@ -529,11 +529,11 @@ def main():
         },
     }
 
-    # Mock SSM keys for skill injection
+    # スキルインジェクション用の SSM キーのモック
     mock_ssm.store["/openclaw/demo/skill-keys/jira-query/JIRA_API_TOKEN"] = "sk-jira-enterprise-xxxx-redacted"
     mock_ssm.store["/openclaw/demo/skill-keys/jira-query/JIRA_BASE_URL"] = "https://acme-corp.atlassian.net"
 
-    # Import the real skill_loader functions
+    # 実際の skill_loader 関数をインポートする
     from skill_loader import is_skill_allowed, load_skill_manifest
 
     print(f"\n  {C.BOLD}Skill manifests in S3 _shared/skills/:{C.END}")
@@ -542,7 +542,7 @@ def main():
         env_req = manifest["requires"]["env"]
         print(f"    {C.CYAN}{name}{C.END}: allowed={perms['allowedRoles']}, blocked={perms['blockedRoles']}, env={env_req}")
 
-    # Engineer (roles: engineering)
+    # エンジニア（ロール: engineering）
     engineer_roles = ["engineering"]
     print(f"\n  {C.BOLD}[Engineer Alex] roles={engineer_roles}{C.END}")
     engineer_skills = []
@@ -555,7 +555,7 @@ def main():
             fail(f"{name}: FILTERED (role not allowed)")
     ok(f"Engineer gets {len(engineer_skills)} skills: {engineer_skills}")
 
-    # Intern (roles: intern)
+    # インターン（ロール: intern）
     intern_roles = ["intern"]
     print(f"\n  {C.BOLD}[Intern Sarah] roles={intern_roles}{C.END}")
     intern_skills = []
@@ -568,7 +568,7 @@ def main():
             fail(f"{name}: FILTERED (blockedRoles contains 'intern')")
     ok(f"Intern gets {len(intern_skills)} skill(s): {intern_skills}")
 
-    # API key injection demo
+    # API キーインジェクションのデモ
     print(f"\n  {C.BOLD}SSM API Key Injection:{C.END}")
     for env_var in mock_skill_manifests["jira-query"]["requires"]["env"]:
         ssm_path = f"/openclaw/demo/skill-keys/jira-query/{env_var}"
@@ -581,22 +581,22 @@ def main():
     info("Keys written to /tmp/skill_env.sh → sourced by entrypoint.sh")
 
     # ------------------------------------------------------------------
-    # Scenario 9: Token Metering & Cost Tracking
+    # シナリオ 9: トークンメータリングとコスト追跡
     # ------------------------------------------------------------------
     section("Scenario 9: Token Metering & Cost Tracking")
     print(f"  {C.DIM}Per-tenant token tracking with Nova 2 Lite pricing.")
     print(f"  Input: $0.30/1M tokens, Output: $2.50/1M tokens.{C.END}")
 
-    # Simulate 3 tenants with different usage patterns
+    # 異なる使用パターンを持つ 3 テナントをシミュレートする
     metering_data = {
         "tg__engineer_alex": {"name": "Alex (Engineer)", "input_tokens": 45000, "output_tokens": 12000, "requests": 45},
         "wa__intern_sarah":  {"name": "Sarah (Intern)",   "input_tokens": 3200,  "output_tokens": 1800,  "requests": 12},
         "sl__finance_carol": {"name": "Carol (Finance)",  "input_tokens": 8500,  "output_tokens": 4100,  "requests": 8},
     }
 
-    NOVA_INPUT_RATE = 0.30   # per 1M tokens
-    NOVA_OUTPUT_RATE = 2.50  # per 1M tokens
-    CHATGPT_PLUS_MONTHLY = 20.00  # per seat
+    NOVA_INPUT_RATE = 0.30   # 100万トークンあたり
+    NOVA_OUTPUT_RATE = 2.50  # 100万トークンあたり
+    CHATGPT_PLUS_MONTHLY = 20.00  # シートあたり
 
     total_input = 0
     total_output = 0
@@ -617,12 +617,12 @@ def main():
     print(f"  {'─' * 58}")
     print(f"  {C.BOLD}{'TOTAL':<22} {total_input:>8,} {total_output:>8,} ${total_cost:>8.4f} {sum(d['requests'] for d in metering_data.values()):>6}{C.END}")
 
-    # Cost comparison
+    # コスト比較
     num_users = len(metering_data)
     chatgpt_cost = num_users * CHATGPT_PLUS_MONTHLY
 
     print(f"\n  {C.BOLD}Cost Comparison (monthly projection for {num_users} users):{C.END}")
-    monthly_projection = total_cost * 30  # daily → monthly
+    monthly_projection = total_cost * 30  # 1日分 → 月間換算
     print(f"    OpenClaw + Nova 2 Lite:  ${monthly_projection:>8.2f}/mo  (pay-per-token)")
     print(f"    ChatGPT Plus:            ${chatgpt_cost:>8.2f}/mo  ({num_users} × $20/seat)")
     savings = chatgpt_cost - monthly_projection
@@ -630,16 +630,16 @@ def main():
     ok(f"Savings: ${savings:.2f}/mo ({savings_pct:.0f}% cheaper with OpenClaw)")
 
     # ------------------------------------------------------------------
-    # Scenario 10: Cold Start Fast-Path
+    # シナリオ 10: コールドスタート高速パス
     # ------------------------------------------------------------------
     section("Scenario 10: Cold Start Fast-Path (H2 Proxy)")
     print(f"  {C.DIM}The H2 Proxy implements a tenant state machine: cold → warming → warm.")
     print(f"  Cold tenants get fast-path direct Bedrock (~3s) while microVM prewarms async.{C.END}")
 
     import random
-    random.seed(42)  # Reproducible timings
+    random.seed(42)  # 再現可能なタイミング
 
-    # Simulate tenant state machine
+    # テナントのステートマシンをシミュレートする
     tenant_states = {
         "cold_tenant_new":    {"state": "cold",    "label": "New Employee (first request)"},
         "warming_tenant_mid": {"state": "warming", "label": "Employee (microVM starting)"},
@@ -654,7 +654,7 @@ def main():
         label = info_data["label"]
 
         if state == "cold":
-            # Fast-path: direct Bedrock call, async prewarm
+            # 高速パス: 直接 Bedrock 呼び出し、非同期プレウォーム
             latency_ms = random.randint(2800, 3500)
             path = "fast-path → direct Bedrock"
             quality = "basic"
@@ -663,7 +663,7 @@ def main():
             info(f"  → async prewarm: launching microVM in background...")
 
         elif state == "warming":
-            # Try router with timeout, fallback to fast-path
+            # タイムアウト付きでルーターを試み、失敗したら高速パスにフォールバックする
             router_timeout_ms = 5000
             actual_warmup_ms = random.randint(6000, 12000)
             print(f"  {C.CYAN}{'WARMING':<16}{C.END} try router ({router_timeout_ms}ms timeout)...")
@@ -677,7 +677,7 @@ def main():
                 print(f"  {C.CYAN}{'':<16}{C.END} {path:<32} {actual_warmup_ms:>7}ms   {'full':>10}")
 
         elif state == "warm":
-            # Full OpenClaw pipeline
+            # 完全な OpenClaw パイプライン
             latency_ms = random.randint(5000, 10000)
             path = "router → OpenClaw pipeline"
             quality = "full"
@@ -691,13 +691,13 @@ def main():
     ok("Zero cold-start failures: every tenant gets a response within ~3s")
 
     # ------------------------------------------------------------------
-    # Scenario 11: Skill + Permission Integration (end-to-end)
+    # シナリオ 11: スキルと権限の統合（エンドツーエンド）
     # ------------------------------------------------------------------
     section("Scenario 11: Skill + Permission Integration (End-to-End)")
     print(f"  {C.DIM}Full flow: skill loading → permission check → API key injection → execution.")
     print(f"  Shows how skills, roles, and security work together.{C.END}")
 
-    # Sub-scenario A: Engineer queries JIRA (success)
+    # サブシナリオ A: エンジニアが JIRA を照会する（成功）
     print(f"\n  {C.BOLD}[A] Engineer asks: \"query JIRA-1234\"{C.END}")
     eng_roles = ["engineering"]
     jira_manifest = mock_skill_manifests["jira-query"]
@@ -709,7 +709,7 @@ def main():
     ok(f"Step 4 — Execution: jira-query skill calls {jira_manifest['requires']['env'][1]}")
     info(f"  → Response: \"JIRA-1234: 'Fix login timeout' — Status: In Progress, Assignee: Alice\"")
 
-    # Sub-scenario B: Intern queries JIRA (denied gracefully)
+    # サブシナリオ B: インターンが JIRA を照会する（グレースフルに拒否）
     print(f"\n  {C.BOLD}[B] Intern asks: \"query JIRA-1234\"{C.END}")
     int_roles = ["intern"]
     jira_allowed_intern = is_skill_allowed(jira_manifest, int_roles)
@@ -717,7 +717,7 @@ def main():
     ok(f"Step 2 — Graceful denial: skill not available, no error — just not in skill list")
     info(f"  → Response: \"I don't have a Jira integration available. Contact IT to request access.\"")
 
-    # Sub-scenario C: Admin tries to install malicious skill (always blocked)
+    # サブシナリオ C: 管理者が悪意のあるスキルをインストールしようとする（常にブロック）
     print(f"\n  {C.BOLD}[C] Admin asks: \"install malicious-skill\"{C.END}")
     ok(f"Step 1 — Skill loading: N/A (install_skill is in ALWAYS_BLOCKED)")
     fail(f"Step 2 — BLOCKED: install_skill is hardcoded blocked regardless of role or skills")
@@ -731,7 +731,7 @@ def main():
     ok("Three layers of defense: skill filtering → permission profile → response audit")
 
     # ------------------------------------------------------------------
-    # Summary
+    # サマリー
     # ------------------------------------------------------------------
     banner("Demo Complete — Summary")
 

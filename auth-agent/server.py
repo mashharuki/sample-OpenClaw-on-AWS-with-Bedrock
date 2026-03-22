@@ -1,10 +1,10 @@
 """
-Authorization Agent HTTP server.
+認可エージェント HTTP サーバー。
 
-Receives PermissionRequest payloads from Agent Containers via AgentCore Runtime
-/invocations endpoint, processes them through handler.py, and returns the result.
+AgentCore Runtime の /invocations エンドポイント経由でエージェントコンテナから
+PermissionRequest ペイロードを受信し、handler.py で処理して結果を返す。
 
-This is the entry point for the Authorization Agent Docker container.
+これは認可エージェント Docker コンテナのエントリポイントである。
 """
 import json
 import logging
@@ -19,7 +19,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Ensure auth-agent modules are importable
+# auth-agent モジュールをインポート可能にする
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from permission_request import PermissionRequest
@@ -53,14 +53,14 @@ class AuthAgentHandler(BaseHTTPRequestHandler):
                 self._respond(400, {"error": "invalid json"})
                 return
 
-            # Handle /pending approvals command
+            # /pending approvals コマンドを処理
             message = payload.get("message", "")
             if message.strip().lower() in ("/pending approvals", "pending approvals"):
                 result = handle_pending_approvals_command()
                 self._respond(200, {"response": result})
                 return
 
-            # Validate approval responses for injection
+            # 承認レスポンスのインジェクション対策バリデーション
             if "approval_response" in payload:
                 try:
                     payload["approval_response"] = validate_approval_input(
@@ -71,7 +71,7 @@ class AuthAgentHandler(BaseHTTPRequestHandler):
                     self._respond(400, {"error": str(e)})
                     return
 
-            # Handle PermissionRequest payload
+            # PermissionRequest ペイロードを処理
             try:
                 validated = validate_permission_request_fields(payload)
                 request = PermissionRequest(

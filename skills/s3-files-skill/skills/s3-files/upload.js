@@ -11,18 +11,18 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 function sanitizeS3Key(key) {
   if (!key) return null;
   
-  // Remove path traversal attempts and invalid characters
+  // パストラバーサルの試みと無効な文字を除去
   let sanitized = key
     .replace(/\.\./g, '')
     .replace(/^\/+/, '')
     .replace(/[^a-zA-Z0-9._-]/g, '_');
   
-  // Limit length
+  // 長さを制限
   if (sanitized.length > 1024) {
     sanitized = sanitized.substring(0, 1024);
   }
   
-  // Ensure it's in uploads directory
+  // uploads ディレクトリ内であることを確認
   if (!sanitized.startsWith('uploads/')) {
     sanitized = `uploads/${sanitized}`;
   }
@@ -36,7 +36,7 @@ async function uploadFile(filePath, s3Key) {
     throw new Error('File not found');
   }
 
-  // Check file size before reading
+  // 読み込み前にファイルサイズを確認
   const stats = fs.statSync(filePath);
   if (stats.size > MAX_FILE_SIZE) {
     console.error('❌ File too large (max 100MB)');
@@ -46,7 +46,7 @@ async function uploadFile(filePath, s3Key) {
   const fileContent = fs.readFileSync(filePath);
   const fileName = path.basename(filePath);
   
-  // Sanitize the S3 key
+  // S3 キーをサニタイズ
   const key = sanitizeS3Key(s3Key) || `uploads/${Date.now()}-${fileName}`;
 
   console.log(`📤 Uploading ${fileName}...`);
@@ -63,7 +63,7 @@ async function uploadFile(filePath, s3Key) {
     await s3Client.send(command);
     console.log(`✅ Upload complete!`);
 
-    // Generate download URL using the hybrid approach from download-url.js
+    // download-url.js のハイブリッドアプローチを使ってダウンロード URL を生成
     const downloadUrl = await generateDownloadUrl(key, config.defaultExpirationHours);
     
     const fileSize = (fileContent.length / 1024).toFixed(2);
@@ -95,7 +95,7 @@ function getContentType(filename) {
   return types[ext] || 'application/octet-stream';
 }
 
-// CLI usage
+// CLI 使用方法
 if (require.main === module) {
   const filePath = process.argv[2];
   const s3Key = process.argv[3];

@@ -1,10 +1,10 @@
 """
-AgentCore Identity — token issuance and validation.
+AgentCore アイデンティティ — トークン発行と検証。
 
-Implements a lightweight in-memory approval-token store that mirrors the
-@requires_access_token pattern described in the design document.
+設計ドキュメントに記述された @requires_access_token パターンを反映した
+軽量インメモリ承認トークンストアを実装する。
 
-Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7
+要件: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7
 """
 
 import logging
@@ -15,19 +15,19 @@ from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-# Tools that require an approval token before execution (requirement 5.6)
+# 実行前に承認トークンが必要なツール (要件 5.6)
 REQUIRES_TOKEN_TOOLS = ["shell", "file_write", "code_execution"]
 
-# Maximum token lifetime in hours (requirement 5.5)
+# トークンの最大有効期間 (時間単位) (要件 5.5)
 MAX_TOKEN_TTL_HOURS = 24
 
-# In-memory token store keyed by (tenant_id, resource)
+# (tenant_id, resource) をキーとするインメモリトークンストア
 _token_store: Dict[Tuple[str, str], "ApprovalToken"] = {}
 
 
 @dataclass
 class ApprovalToken:
-    """Represents a time-limited approval token for a protected tool/resource."""
+    """保護されたツール/リソース向けの時間制限付き承認トークンを表す。"""
 
     token_id: str
     tenant_id: str
@@ -42,16 +42,15 @@ def issue_approval_token(
     ttl_hours: int,
 ) -> ApprovalToken:
     """
-    Issue an approval token for *tenant_id* to access *resource*.
+    *tenant_id* が *resource* にアクセスするための承認トークンを発行する。
 
-    The effective TTL is ``min(ttl_hours, MAX_TOKEN_TTL_HOURS)`` hours so that
-    no token can ever be valid for more than 24 hours (requirement 5.5).
+    有効な TTL は ``min(ttl_hours, MAX_TOKEN_TTL_HOURS)`` 時間であり、
+    トークンが 24 時間を超えて有効になることはない (要件 5.5)。
 
-    Any previously stored token for the same (tenant_id, resource) pair is
-    replaced — there is no auto-renewal; the caller must explicitly request a
-    new token (requirement 5.7).
+    同一の (tenant_id, resource) ペアに既存トークンがある場合は置き換えられる —
+    自動更新はなく、呼び出し元が明示的に新しいトークンを要求する必要がある (要件 5.7)。
 
-    Requirements: 5.4, 5.5
+    要件: 5.4, 5.5
     """
     effective_ttl = min(ttl_hours, MAX_TOKEN_TTL_HOURS)
     now = datetime.now(timezone.utc)
@@ -75,15 +74,14 @@ def issue_approval_token(
 
 def validate_token(tenant_id: str, resource: str) -> bool:
     """
-    Return True if a valid (non-expired) approval token exists for
-    *tenant_id* / *resource*, False otherwise.
+    *tenant_id* / *resource* に対して有効な (期限切れでない) 承認トークンが存在する場合は
+    True を返し、それ以外は False を返す。
 
-    When the token is missing or expired the function logs a message
-    indicating that authorization is required and returns False — the
-    caller is responsible for triggering the authorization-request flow
-    (requirement 5.3).  Expired tokens are NOT auto-renewed (requirement 5.7).
+    トークンが存在しないか期限切れの場合、認可が必要であることを示すメッセージを記録し
+    False を返す — 呼び出し元が認可リクエストフローを開始する責任を持つ (要件 5.3)。
+    期限切れトークンは自動更新されない (要件 5.7)。
 
-    Requirements: 5.2, 5.3, 5.7
+    要件: 5.2, 5.3, 5.7
     """
     token: Optional[ApprovalToken] = _token_store.get((tenant_id, resource))
 
@@ -105,7 +103,7 @@ def validate_token(tenant_id: str, resource: str) -> bool:
             resource,
             token.expires_at.isoformat(),
         )
-        # Remove the stale token; no auto-renewal (requirement 5.7)
+        # 古いトークンを削除; 自動更新なし (要件 5.7)
         del _token_store[(tenant_id, resource)]
         return False
 
@@ -113,11 +111,11 @@ def validate_token(tenant_id: str, resource: str) -> bool:
 
 
 def revoke_token(tenant_id: str, resource: str) -> None:
-    """Remove the token for (tenant_id, resource) if it exists."""
+    """(tenant_id, resource) のトークンが存在する場合は削除する。"""
     _token_store.pop((tenant_id, resource), None)
     logger.info("Approval token revoked tenant_id=%s resource=%s", tenant_id, resource)
 
 
 def clear_all_tokens() -> None:
-    """Clear the entire in-memory token store (useful for testing)."""
+    """インメモリトークンストア全体をクリアする (テスト用に有用)。"""
     _token_store.clear()

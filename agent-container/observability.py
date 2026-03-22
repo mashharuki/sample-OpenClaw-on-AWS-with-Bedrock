@@ -1,12 +1,12 @@
 """
-Structured logging utilities for CloudWatch observability.
+CloudWatch オブザーバビリティ向け構造化ログユーティリティ。
 
-All log entries are emitted via Python's standard logging module in the format:
+すべてのログエントリは Python 標準の logging モジュール経由で以下の形式で出力される:
     STRUCTURED_LOG {json_string}
 
-This prefix allows tests and log processors to reliably parse structured entries.
+このプレフィックスにより、テストやログプロセッサが構造化エントリを確実にパースできる。
 
-Requirements: 8.1, 8.2, 8.3, 8.4
+要件: 8.1, 8.2, 8.3, 8.4
 """
 
 import json
@@ -16,7 +16,7 @@ import sys
 from datetime import datetime, timezone
 from typing import List, Optional
 
-# Allow importing PermissionRequest from auth-agent when running inside agent-container
+# agent-container 内で動作中に auth-agent から PermissionRequest をインポートできるようにする
 _auth_agent_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "auth-agent")
 if _auth_agent_path not in sys.path:
     sys.path.insert(0, _auth_agent_path)
@@ -36,22 +36,22 @@ def log_agent_invocation(
     status: str,
 ) -> None:
     """
-    Log a structured entry for each AgentCore Runtime invocation.
+    AgentCore Runtime の各呼び出しに対して構造化ログエントリを記録する。
 
-    The log stream is identified by the ``log_stream`` field set to
-    ``tenant_{tenant_id}`` (requirement 8.4).
+    ログストリームは ``log_stream`` フィールドが
+    ``tenant_{tenant_id}`` (要件 8.4) に設定されることで識別される。
 
-    Fields emitted (requirement 8.1):
+    出力フィールド (要件 8.1):
     - tenant_id
     - session_id  (= tenant_id)
-    - tools_used  (list)
+    - tools_used  (リスト)
     - duration_ms
     - status
     - timestamp
     - event_type  = "agent_invocation"
     - log_stream  = "tenant_{tenant_id}"
 
-    Requirements: 8.1, 8.4
+    要件: 8.1, 8.4
     """
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -73,21 +73,21 @@ def log_permission_denied(
     request_id: Optional[str] = None,
 ) -> None:
     """
-    Log an audit entry when a tool call is denied by the permission system.
+    ツール呼び出しがパーミッションシステムによって拒否された際に監査ログエントリを記録する。
 
-    The log stream is identified by the ``log_stream`` field set to
-    ``tenant_{tenant_id}`` (requirement 8.4).
+    ログストリームは ``log_stream`` フィールドが
+    ``tenant_{tenant_id}`` (要件 8.4) に設定されることで識別される。
 
-    Fields emitted (requirement 8.2):
+    出力フィールド (要件 8.2):
     - tenant_id
     - tool_name
     - cedar_decision
-    - request_id   (optional permission-request UUID)
+    - request_id   (オプションのパーミッションリクエスト UUID)
     - timestamp
     - event_type   = "permission_denied"
     - log_stream   = "tenant_{tenant_id}"
 
-    Requirements: 8.2, 8.4
+    要件: 8.2, 8.4
     """
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -107,12 +107,12 @@ def log_approval_decision(
     approver_note: Optional[str] = None,
 ) -> None:
     """
-    Log an audit entry for every approval decision made by the Authorization_Agent.
+    Authorization_Agent によるすべての承認決定に対して監査ログエントリを記録する。
 
-    The log stream is ``auth-agent`` (not tenant-prefixed) because this event
-    originates from the Authorization_Agent session, not a tenant session.
+    ログストリームはテナント名プレフィックスなしの ``auth-agent`` (このイベントが
+    テナントセッションではなく Authorization_Agent セッションから発生するため)。
 
-    Fields emitted (requirement 8.3):
+    出力フィールド (要件 8.3):
     - request_id
     - tenant_id
     - resource
@@ -122,7 +122,7 @@ def log_approval_decision(
     - event_type  = "approval_decision"
     - log_stream  = "auth-agent"
 
-    Requirements: 8.3
+    要件: 8.3
     """
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),

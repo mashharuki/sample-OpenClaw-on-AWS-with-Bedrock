@@ -1,7 +1,7 @@
 """
-Authorization_Agent handler — approval notification and Human-in-the-Loop flow.
+Authorization_Agent ハンドラー — 承認通知とヒューマンインザループフロー。
 
-Requirements: 9.3, 9.4, 9.7, 9.9
+要件: 9.3, 9.4, 9.7, 9.9
 """
 
 import logging
@@ -21,10 +21,10 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Input validation for approval messages
+# 承認メッセージの入力バリデーション
 # ---------------------------------------------------------------------------
 
-# Patterns that indicate prompt injection in approval responses
+# 承認レスポンスにおけるプロンプトインジェクションを示すパターン
 _APPROVAL_INJECTION_PATTERNS = [
     re.compile(r"ignore\s+(all\s+)?(previous|prior|above)\s+instructions", re.IGNORECASE),
     re.compile(r"you\s+are\s+now\s+", re.IGNORECASE),
@@ -40,14 +40,14 @@ MAX_REASON_LENGTH = 500
 
 
 def validate_approval_input(message: str) -> str:
-    """Validate an approval response from Human_Approver.
+    """Human_Approver からの承認レスポンスを検証する。
 
-    Checks for:
-    - Message length (max 2000 chars)
-    - Prompt injection patterns
-    - Returns sanitized message
+    以下を確認する:
+    - メッセージ長 (最大 2000 文字)
+    - プロンプトインジェクションパターン
+    - サニタイズ済みメッセージを返す
 
-    Raises ValueError if injection detected.
+    インジェクションが検出された場合は ValueError を送出する。
     """
     if len(message) > MAX_APPROVAL_MESSAGE_LENGTH:
         logger.warning("Approval message truncated: %d > %d", len(message), MAX_APPROVAL_MESSAGE_LENGTH)
@@ -66,13 +66,13 @@ def validate_approval_input(message: str) -> str:
 
 
 def validate_permission_request_fields(payload: dict) -> dict:
-    """Validate fields in an incoming PermissionRequest payload.
+    """受信した PermissionRequest ペイロードのフィールドを検証する。
 
-    Checks:
-    - tenant_id: alphanumeric + underscore/hyphen/dot, max 128 chars
-    - resource: no null bytes, no path traversal, max 512 chars
-    - reason: max 500 chars, no injection patterns
-    - resource_type: must be one of allowed values
+    確認内容:
+    - tenant_id: 英数字 + アンダースコア/ハイフン/ドット、最大 128 文字
+    - resource: null バイトなし、パストラバーサルなし、最大 512 文字
+    - reason: 最大 500 文字、インジェクションパターンなし
+    - resource_type: 許可された値のいずれかであること
     """
     import re as _re
 
@@ -100,7 +100,7 @@ def validate_permission_request_fields(payload: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# SSM system prompt (Requirement 9.9)
+# SSM システムプロンプト (要件 9.9)
 # ---------------------------------------------------------------------------
 
 STACK_NAME = os.environ.get("STACK_NAME", "dev")
@@ -111,17 +111,17 @@ _DEFAULT_SYSTEM_PROMPT = (
 
 
 def _ssm_client():
-    """Factory for the SSM boto3 client — mockable in tests."""
+    """SSM boto3 クライアントのファクトリ — テストでモック可能。"""
     return boto3.client("ssm", region_name=os.environ.get("AWS_REGION", "us-east-1"))
 
 
 def load_system_prompt() -> str:
-    """Read the system prompt from SSM Parameter Store.
+    """SSM パラメータストアからシステムプロンプトを読み込む。
 
-    Falls back to the hardcoded default if SSM is unavailable or the
-    parameter does not exist, so the agent keeps working without SSM.
+    SSM が利用できない場合やパラメータが存在しない場合はハードコードされた
+    デフォルトにフォールバックし、SSM なしでもエージェントが動作し続けるようにする。
 
-    Requirement: 9.9
+    要件: 9.9
     """
     path = _SYSTEM_PROMPT_SSM_PATH
     try:
@@ -138,21 +138,21 @@ def load_system_prompt() -> str:
 
 
 def get_system_prompt() -> str:
-    """Return the current system prompt, re-reading SSM on every call (hot-reload).
+    """現在のシステムプロンプトを返す。SSM を毎回再読み込みする (ホットリロード)。
 
-    Requirement: 9.9
+    要件: 9.9
     """
     return load_system_prompt()
 
 
 # ---------------------------------------------------------------------------
-# In-memory store for pending requests
+# 保留リクエストのインメモリストア
 # ---------------------------------------------------------------------------
 _pending_requests: dict[str, PermissionRequest] = {}
 _timers: dict[str, threading.Timer] = {}
 
 # ---------------------------------------------------------------------------
-# Risk assessment
+# リスク評価
 # ---------------------------------------------------------------------------
 
 _LOW_RISK_TOOLS = {"web_search"}
@@ -164,7 +164,7 @@ _HIGH_RISK_KEYWORDS = {"system", "/etc/", "/var/", "/usr/", "/bin/", "/sbin/"}
 
 
 def assess_risk_level(request: PermissionRequest) -> str:
-    """Return '低', '中', or '高' based on the requested resource."""
+    """リクエストされたリソースに基づいて '低'、'中'、または '高' を返す。"""
     resource = request.resource.lower()
     resource_type = request.resource_type
 
@@ -175,7 +175,7 @@ def assess_risk_level(request: PermissionRequest) -> str:
             return "中"
         if resource in _LOW_RISK_TOOLS:
             return "低"
-        # Unknown tool — default to medium
+        # 未知のツール — デフォルトは中リスク
         return "中"
 
     # data_path or api_endpoint
@@ -188,72 +188,72 @@ def assess_risk_level(request: PermissionRequest) -> str:
     return "中"
 
 # ---------------------------------------------------------------------------
-# Risk descriptions
+# リスク説明
 # ---------------------------------------------------------------------------
 
 _RISK_DESCRIPTIONS = {
-    "低": "该操作属于低风险只读或公开访问，对系统安全影响有限。",
-    "中": "该操作涉及文件写入或代码执行，可能对系统状态产生影响，请谨慎审批。",
-    "高": "该操作属于高风险操作（如 shell 执行或系统路径访问），可能对系统安全造成严重影响，强烈建议仅授予临时权限。",
+    "低": "この操作は低リスクの読み取り専用またはパブリックアクセスであり、システムセキュリティへの影響は限定的です。",
+    "中": "この操作はファイル書き込みまたはコード実行を伴い、システム状態に影響を与える可能性があります。慎重に承認してください。",
+    "高": "この操作は高リスク操作（シェル実行やシステムパスアクセスなど）であり、システムセキュリティに重大な影響を与える可能性があります。一時的な権限のみ付与することを強く推奨します。",
 }
 
 # ---------------------------------------------------------------------------
-# Notification formatting
+# 通知フォーマット
 # ---------------------------------------------------------------------------
 
 
 def format_approval_notification(request: PermissionRequest) -> str:
-    """Return the formatted approval notification string for Human_Approver."""
+    """Human_Approver 向けにフォーマットされた承認通知文字列を返す。"""
     risk = assess_risk_level(request)
     risk_desc = _RISK_DESCRIPTIONS[risk]
 
     if request.duration_type == "temporary" and request.suggested_duration_hours:
-        duration_str = f"临时（{request.suggested_duration_hours} 小时）"
-        approve_temp_label = f"✅ 批准（临时）- 授权 {request.suggested_duration_hours} 小时"
+        duration_str = f"一時的（{request.suggested_duration_hours} 時間）"
+        approve_temp_label = f"✅ 承認（一時的）- {request.suggested_duration_hours} 時間の権限付与"
     elif request.duration_type == "temporary":
-        duration_str = "临时（1 小时）"
-        approve_temp_label = "✅ 批准（临时）- 授权 1 小时"
+        duration_str = "一時的（1 時間）"
+        approve_temp_label = "✅ 承認（一時的）- 1 時間の権限付与"
     else:
-        duration_str = "持久"
-        approve_temp_label = "✅ 批准（临时）- 授权 1 小时"
+        duration_str = "永続的"
+        approve_temp_label = "✅ 承認（一時的）- 1 時間の権限付与"
 
     resource_type_label = {
-        "tool": "工具",
-        "data_path": "数据路径",
-        "api_endpoint": "API 端点",
+        "tool": "ツール",
+        "data_path": "データパス",
+        "api_endpoint": "API エンドポイント",
     }.get(request.resource_type, request.resource_type)
 
     lines = [
-        "🔐 **权限申请通知**",
+        "🔐 **権限申請通知**",
         "",
-        f"**申请人**：{request.tenant_id}",
-        f"**申请资源**：{request.resource}（{resource_type_label}）",
-        f"**申请原因**：{request.reason}",
-        f"**建议时效**：{duration_str}",
-        f"**风险等级**：{risk}",
+        f"**申請人**：{request.tenant_id}",
+        f"**申請リソース**：{request.resource}（{resource_type_label}）",
+        f"**申請理由**：{request.reason}",
+        f"**推奨有効期間**：{duration_str}",
+        f"**リスクレベル**：{risk}",
         "",
-        f"**风险说明**：{risk_desc}",
+        f"**リスク説明**：{risk_desc}",
         "",
-        "**请回复以下选项之一**：",
+        "**以下のいずれかで返信してください**：",
         approve_temp_label,
-        "✅ 批准（持久）- 永久加入白名单",
-        "⚠️ 部分批准 - 请说明限制条件",
-        "❌ 拒绝 - 请说明原因（可选）",
+        "✅ 承認（永続的）- ホワイトリストに永久追加",
+        "⚠️ 部分承認 - 制限条件を説明してください",
+        "❌ 拒否 - 理由を説明してください（任意）",
         "",
-        "⏰ 30 分钟内未回复将自动拒绝。",
+        "⏰ 30 分以内に返信がない場合は自動拒否されます。",
     ]
     return "\n".join(lines)
 
 # ---------------------------------------------------------------------------
-# Notification sending (abstracted — actual channel integration out of scope)
+# 通知送信 (抽象化済み — 実際のチャネル統合はスコープ外)
 # ---------------------------------------------------------------------------
 
 
 def _send_notification(message: str, tenant_id: str) -> None:
-    """Send a notification message to the Human_Approver channel.
+    """Human_Approver チャネルへ通知メッセージを送信する。
 
-    The actual WhatsApp/Telegram integration is out of scope; we log the
-    message so it is visible in CloudWatch Logs.
+    実際の WhatsApp/Telegram 統合はスコープ外のため、
+    CloudWatch Logs で確認できるようメッセージをログ出力する。
     """
     logger.info(
         "[auth-agent] NOTIFICATION tenant_id=%s message=%s",
@@ -263,12 +263,12 @@ def _send_notification(message: str, tenant_id: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Agent Container notification
+# エージェントコンテナへの通知
 # ---------------------------------------------------------------------------
 
 
 def _notify_agent_container(request_id: str, status: str, reason: Optional[str] = None) -> None:
-    """Notify the originating Agent Container of the approval outcome."""
+    """承認結果を元のエージェントコンテナに通知する。"""
     logger.info(
         "[auth-agent] AGENT_NOTIFY request_id=%s status=%s reason=%s",
         request_id,
@@ -278,17 +278,17 @@ def _notify_agent_container(request_id: str, status: str, reason: Optional[str] 
 
 
 # ---------------------------------------------------------------------------
-# Auto-reject on timeout
+# タイムアウト時の自動拒否
 # ---------------------------------------------------------------------------
 
 
 def auto_reject(request_id: str) -> None:
-    """Called by the 30-minute timer when Human_Approver has not replied."""
+    """Human_Approver が返信しなかった場合に 30 分タイマーから呼び出される。"""
     request = _pending_requests.pop(request_id, None)
     _timers.pop(request_id, None)
 
     if request is None:
-        # Already handled (approved/rejected) before timeout fired
+        # タイムアウト発火前に既に処理済み (承認/拒否)
         return
 
     request.status = "timeout"
@@ -300,41 +300,41 @@ def auto_reject(request_id: str) -> None:
         request.resource,
     )
 
-    _notify_agent_container(request_id, "timeout", reason="30 分钟内未收到审批回复，已自动拒绝。")
+    _notify_agent_container(request_id, "timeout", reason="30 分以内に審査回答がなかったため、自動拒否しました。")
 
-    # Optionally notify the Human_Approver that the request timed out
+    # リクエストがタイムアウトしたことを Human_Approver に任意で通知
     timeout_msg = (
-        f"⏰ 权限申请已超时自动拒绝。\n"
-        f"申请人：{request.tenant_id}\n"
-        f"申请资源：{request.resource}\n"
-        f"申请 ID：{request_id}"
+        f"⏰ 権限申請がタイムアウトのため自動拒否されました。\n"
+        f"申請人：{request.tenant_id}\n"
+        f"申請リソース：{request.resource}\n"
+        f"申請 ID：{request_id}"
     )
     _send_notification(timeout_msg, request.tenant_id)
 
 # ---------------------------------------------------------------------------
-# Main entry point
+# メインエントリポイント
 # ---------------------------------------------------------------------------
 
 TIMEOUT_SECONDS = 30 * 60  # 30 minutes
 
 
 def handle_permission_request(request: PermissionRequest) -> dict:
-    """Process an incoming PermissionRequest.
+    """受信した PermissionRequest を処理する。
 
-    1. Load the system prompt (hot-reload from SSM on each call).
-    2. Format the approval notification.
-    3. Store the request in the pending dict.
-    4. Send the notification to the Human_Approver channel.
-    5. Start a 30-minute timer that calls auto_reject on expiry.
+    1. システムプロンプトを読み込む (各呼び出し時に SSM からホットリロード)。
+    2. 承認通知をフォーマットする。
+    3. リクエストを保留辞書に格納する。
+    4. Human_Approver チャネルへ通知を送信する。
+    5. 期限切れ時に auto_reject を呼び出す 30 分タイマーを開始する。
 
-    Returns a dict with the request_id, notification message, and SSM prompt path.
+    request_id、通知メッセージ、SSM プロンプトパスを含む dict を返す。
     """
-    # Hot-reload system prompt on every request (Requirement 9.9)
+    # リクエストごとにシステムプロンプトをホットリロード (要件 9.9)
     get_system_prompt()
 
     notification = format_approval_notification(request)
 
-    # Store in pending store
+    # 保留ストアに格納
     _pending_requests[request.request_id] = request
     request.status = "pending"
 
@@ -345,10 +345,10 @@ def handle_permission_request(request: PermissionRequest) -> dict:
         request.resource,
     )
 
-    # Send notification to Human_Approver
+    # Human_Approver へ通知を送信
     _send_notification(notification, request.tenant_id)
 
-    # Start 30-minute auto-reject timer
+    # 30 分の自動拒否タイマーを開始
     timer = threading.Timer(TIMEOUT_SECONDS, auto_reject, args=(request.request_id,))
     timer.daemon = True
     timer.start()
@@ -364,16 +364,16 @@ def handle_permission_request(request: PermissionRequest) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Pending list query (for /pending approvals)
+# 保留リスト照会 (/pending approvals 用)
 # ---------------------------------------------------------------------------
 
 
 def list_pending_requests() -> list[dict]:
-    """Return a summary of all pending requests for Human_Approver queries."""
+    """Human_Approver クエリ用に全保留リクエストのサマリーを返す。"""
     now = datetime.now(timezone.utc)
     result = []
     for idx, (rid, req) in enumerate(_pending_requests.items(), start=1):
-        # Make expires_at timezone-aware if it isn't already
+        # expires_at がタイムゾーン情報を持っていない場合は UTC を付与
         expires_at = req.expires_at
         if expires_at.tzinfo is None:
             expires_at = expires_at.replace(tzinfo=timezone.utc)
@@ -397,37 +397,37 @@ def list_pending_requests() -> list[dict]:
 
 
 def format_pending_list(requests: list) -> str:
-    """Format a list of pending request dicts as a human-readable string.
+    """保留リクエスト辞書のリストを人間が読みやすい文字列にフォーマットする。
 
-    Each item is expected to have the keys returned by list_pending_requests():
-    index, tenant_id, resource, waited_seconds, remaining_seconds.
+    各アイテムは list_pending_requests() が返すキーを持つことが期待される:
+    index、tenant_id、resource、waited_seconds、remaining_seconds。
 
-    Returns a Chinese-language summary suitable for sending via a message channel.
+    メッセージチャネル経由で送信するのに適した日本語サマリーを返す。
 
-    Requirement: 9.8
+    要件: 9.8
     """
     if not requests:
-        return "当前没有待审批的权限申请"
+        return "現在、承認待ちの権限申請はありません"
 
-    lines = [f"待审批列表（共 {len(requests)} 项）："]
+    lines = [f"承認待ちリスト（計 {len(requests)} 件）："]
     for item in requests:
         waited_min = item["waited_seconds"] // 60
         remaining_min = item["remaining_seconds"] // 60
         lines.append(
-            f"{item['index']}. 申请人：{item['tenant_id']} | "
-            f"资源：{item['resource']} | "
-            f"等待：{waited_min}分钟 | "
-            f"剩余：{remaining_min}分钟"
+            f"{item['index']}. 申請人：{item['tenant_id']} | "
+            f"リソース：{item['resource']} | "
+            f"待機：{waited_min}分 | "
+            f"残り：{remaining_min}分"
         )
     return "\n".join(lines)
 
 
 def handle_pending_approvals_command() -> str:
-    """Handle the '/pending approvals' command from Human_Approver.
+    """Human_Approver からの '/pending approvals' コマンドを処理する。
 
-    Queries the current pending list and returns a formatted string.
+    現在の保留リストを照会してフォーマット済み文字列を返す。
 
-    Requirement: 9.8
+    要件: 9.8
     """
     requests = list_pending_requests()
     return format_pending_list(requests)

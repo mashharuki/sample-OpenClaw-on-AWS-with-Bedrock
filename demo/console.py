@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OpenClaw Multi-Tenant Admin Console. Run: python3 demo/console.py → http://localhost:8099"""
+"""OpenClaw マルチテナント管理コンソール。実行: python3 demo/console.py → http://localhost:8099"""
 import argparse,json,os,re,sys,random
 from datetime import datetime,timezone,timedelta
 from http.server import BaseHTTPRequestHandler,HTTPServer

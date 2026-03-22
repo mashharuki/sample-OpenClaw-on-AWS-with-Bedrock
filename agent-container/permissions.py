@@ -1,8 +1,8 @@
 """
-Permission profile management.
+パーミッションプロファイル管理。
 
-Reads/writes per-tenant permission profiles from SSM Parameter Store.
-Profiles are injected into openclaw's system prompt (Plan A enforcement).
+SSM パラメータストアからテナントごとのパーミッションプロファイルを読み書きする。
+プロファイルは openclaw のシステムプロンプトに注入される (プランA の強制)。
 """
 import json
 import logging
@@ -34,7 +34,7 @@ PROFILES = {
 
 DEFAULT_PROFILE = PROFILES["basic"]
 
-# Always blocked regardless of profile — arbitrary code execution risk
+# プロファイルに関わらず常にブロック — 任意コード実行リスクのため
 ALWAYS_BLOCKED_TOOLS = {"install_skill", "load_extension", "eval"}
 
 
@@ -55,7 +55,7 @@ def _permissions_ssm_path(tenant_id: str) -> str:
 
 
 def read_permission_profile(tenant_id: str) -> dict:
-    """Read tenant's Permission_Profile from SSM. Falls back to basic."""
+    """テナントのパーミッションプロファイルを SSM から読み込む。取得できない場合は basic にフォールバック。"""
     ssm = _ssm_client()
     path = _permissions_ssm_path(tenant_id)
     try:
@@ -69,7 +69,7 @@ def read_permission_profile(tenant_id: str) -> dict:
 
 
 def write_permission_profile(tenant_id: str, profile: dict) -> None:
-    """Write tenant's Permission_Profile to SSM."""
+    """テナントのパーミッションプロファイルを SSM に書き込む。"""
     ssm = _ssm_client()
     ssm.put_parameter(
         Name=_permissions_ssm_path(tenant_id),
@@ -93,7 +93,7 @@ def _log_permission_denied(tenant_id: str, tool_name: str, resource: Optional[st
 def check_tool_permission(
     tenant_id: str, tool_name: str, resource: Optional[str] = None
 ) -> bool:
-    """Check tool permission against SSM profile. Raises PermissionDeniedError if denied."""
+    """SSM プロファイルに対してツールの権限を確認する。拒否された場合は PermissionDeniedError を発生させる。"""
     if tool_name in ALWAYS_BLOCKED_TOOLS:
         _log_permission_denied(tenant_id, tool_name, resource)
         raise PermissionDeniedError(tenant_id=tenant_id, tool=tool_name, resource=resource)
@@ -106,7 +106,7 @@ def check_tool_permission(
 
 
 def check_data_permission(tenant_id: str, data_path: str) -> bool:
-    """Check data path permission against SSM profile. Raises PermissionDeniedError if denied."""
+    """SSM プロファイルに対してデータパスの権限を確認する。拒否された場合は PermissionDeniedError を発生させる。"""
     profile = read_permission_profile(tenant_id)
     allowed_paths = profile.get("data_permissions", {}).get("file_paths", [])
 
@@ -122,7 +122,7 @@ def check_data_permission(tenant_id: str, data_path: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Authorization Agent integration
+# 認可エージェントとの連携
 # ---------------------------------------------------------------------------
 
 AUTH_AGENT_RUNTIME_ID = os.environ.get("AUTH_AGENT_RUNTIME_ID", "")
@@ -152,7 +152,7 @@ def send_permission_request(
     duration_type: str = "temporary",
     suggested_duration_hours: Optional[int] = 1,
 ):
-    """Send a PermissionRequest to the Authorization Agent."""
+    """認可エージェントへ PermissionRequest を送信する。"""
     now = datetime.now(timezone.utc)
     request = PermissionRequest(
         request_id=str(uuid4()),

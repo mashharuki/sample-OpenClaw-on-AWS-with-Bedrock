@@ -1,23 +1,23 @@
 #!/bin/bash
-# Setup script for running the AWS multi-tenant demo on an EC2 instance.
+# EC2 インスタンスで AWS マルチテナントデモを実行するためのセットアップスクリプト。
 #
-# Prerequisites:
-#   - EC2 instance deployed via CloudFormation (standard or multitenancy template)
-#   - Bedrock model access enabled
+# 前提条件:
+#   - CloudFormation でデプロイされた EC2 インスタンス（標準またはマルチテナントテンプレート）
+#   - Bedrock モデルアクセスが有効化されていること
 #
-# Usage:
-#   # Connect to EC2 via SSM
+# 使用方法:
+#   # SSM 経由で EC2 に接続する
 #   aws ssm start-session --target <INSTANCE_ID> --region <REGION>
 #   sudo su - ubuntu
 #
-#   # Clone repo (if not already present)
+#   # リポジトリをクローンする（まだない場合）
 #   git clone https://github.com/aws-samples/sample-OpenClaw-on-AWS-with-Bedrock.git
 #   cd sample-OpenClaw-on-AWS-with-Bedrock
 #
-#   # Run setup
+#   # セットアップを実行する
 #   bash demo/setup_aws_demo.sh
 #
-#   # Run demo
+#   # デモを実行する
 #   python3 demo/aws_demo.py
 
 set -e
@@ -26,7 +26,7 @@ echo "=========================================="
 echo "OpenClaw Multi-Tenant Demo — Setup"
 echo "=========================================="
 
-# Detect region
+# リージョンを検出する
 if [ -z "$AWS_REGION" ]; then
     IMDS_TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null || echo "")
     if [ -n "$IMDS_TOKEN" ]; then
@@ -37,11 +37,11 @@ if [ -z "$AWS_REGION" ]; then
 fi
 echo "Region: $AWS_REGION"
 
-# Install Python dependencies
+# Python の依存関係をインストールする
 echo "[1/3] Installing Python dependencies..."
 pip3 install --break-system-packages requests boto3 2>/dev/null || pip3 install requests boto3
 
-# Verify AWS credentials
+# AWS 認証情報を確認する
 echo "[2/3] Verifying AWS credentials..."
 if aws sts get-caller-identity --region "$AWS_REGION" > /dev/null 2>&1; then
     echo "✓ AWS credentials OK"
@@ -50,7 +50,7 @@ else
     exit 1
 fi
 
-# Verify Bedrock access
+# Bedrock アクセスを確認する
 echo "[3/3] Verifying Bedrock model access..."
 MODEL_ID="global.amazon.nova-2-lite-v1:0"
 if aws bedrock-runtime invoke-model \

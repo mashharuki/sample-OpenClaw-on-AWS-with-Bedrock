@@ -5,11 +5,11 @@ const config = require('./config.json');
 
 const s3Client = new S3Client({ region: config.region });
 
-// Simple rate limiter
+// シンプルなレートリミッター
 const rateLimiter = {
   calls: [],
   maxCalls: 10,
-  windowMs: 60000, // 1 minute
+  windowMs: 60000, // 1 分
   
   check() {
     const now = Date.now();
@@ -36,8 +36,8 @@ async function generateDownloadUrl(key, expirationHours) {
   console.log(`⏰ Expiration: ${hours} hours`);
 
   try {
-    // Extract clean filename by removing timestamp prefix
-    // Pattern: uploads/1234567890-filename.ext → filename.ext
+    // タイムスタンプのプレフィックスを削除してクリーンなファイル名を取得
+    // パターン: uploads/1234567890-filename.ext → filename.ext
     const cleanFileName = key.replace(/^uploads\/\d+-/, '');
     
     console.log(`📁 S3 Key: ${key}`);
@@ -46,7 +46,7 @@ async function generateDownloadUrl(key, expirationHours) {
     const command = new GetObjectCommand({
       Bucket: config.bucketName,
       Key: key,
-      // Tell browser to download with clean filename (no timestamp)
+      // ブラウザにクリーンなファイル名 (タイムスタンプなし) でダウンロードさせる
       ResponseContentDisposition: `attachment; filename="${cleanFileName}"`,
     });
 
@@ -60,7 +60,7 @@ async function generateDownloadUrl(key, expirationHours) {
   }
 }
 
-// CLI usage
+// CLI 使用方法
 if (require.main === module) {
   const key = process.argv[2];
   const hours = parseInt(process.argv[3]) || config.defaultExpirationHours;

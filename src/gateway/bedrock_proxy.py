@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-Bedrock Converse API Proxy for OpenClaw Multi-Tenant Platform.
+OpenClaw マルチテナントプラットフォーム向け Bedrock Converse API プロキシ。
 
-Sits between Gateway OpenClaw and Tenant Router. Intercepts Bedrock
-Converse API calls from OpenClaw, extracts the user message and session
-context, forwards to Tenant Router (which invokes AgentCore microVM),
-and returns the response in Bedrock Converse API format.
+Gateway OpenClaw とテナントルーター間に位置する。OpenClaw からの Bedrock Converse API
+呼び出しをインターセプトし、ユーザーメッセージとセッションコンテキストを抽出して
+テナントルーター (AgentCore microVM を呼び出す) に転送し、Bedrock Converse API
+フォーマットでレスポンスを返す。
 
-Gateway OpenClaw thinks it's talking to Bedrock. Zero code changes to OpenClaw.
+Gateway OpenClaw は Bedrock と通信していると認識する。OpenClaw のコード変更は不要。
 
-Usage:
+使用方法:
     export TENANT_ROUTER_URL=http://127.0.0.1:8090
-    python3 bedrock_proxy.py  # listens on port 8091
+    python3 bedrock_proxy.py  # ポート 8091 でリッスン
 
-Then set OpenClaw config:
+次に OpenClaw の設定を行う:
     openclaw config set models.providers.amazon-bedrock.baseUrl http://localhost:8091
 """
 import json
@@ -37,14 +37,14 @@ TENANT_ROUTER_URL = os.environ.get("TENANT_ROUTER_URL", "http://127.0.0.1:8090")
 
 
 def extract_user_message(converse_body: dict) -> tuple:
-    """Extract the latest user message text and session context from Converse API request.
+    """Converse API リクエストから最新のユーザーメッセージテキストとセッションコンテキストを抽出する。
 
-    Returns (user_message, channel, user_id) tuple.
+    (user_message, channel, user_id) タプルを返す。
     """
     messages = converse_body.get("messages", [])
     system_parts = converse_body.get("system", [])
 
-    # Find the last user message
+    # 最後のユーザーメッセージを検索
     user_text = ""
     for msg in reversed(messages):
         if msg.get("role") == "user":
@@ -58,25 +58,25 @@ def extract_user_message(converse_body: dict) -> tuple:
             user_text = " ".join(parts).strip()
             break
 
-    # Try to extract channel/user_id from system prompt or message metadata
-    # OpenClaw includes session info like "Session: telegram:+1234567890"
+    # システムプロンプトまたはメッセージメタデータから channel/user_id を抽出しようとする
+    # OpenClaw は "Session: telegram:+1234567890" のようなセッション情報を含む
     channel = "unknown"
     user_id = "unknown"
 
-    # Search system prompt for session routing info
+    # セッションルーティング情報をシステムプロンプトから検索
     system_text = " ".join(
         p.get("text", "") if isinstance(p, dict) else str(p)
         for p in system_parts
     )
 
-    # Pattern: "channel: telegram" or "source: whatsapp" or session key like "agent:main:telegram:+123"
+    # パターン: "channel: telegram"、"source: whatsapp"、または "agent:main:telegram:+123" のようなセッションキー
     ch_match = re.search(
         r'(?:channel|source|platform)[:\s]+(\w+)', system_text, re.IGNORECASE
     )
     if ch_match:
         channel = ch_match.group(1).lower()
 
-    # Pattern: phone number, telegram id, discord id
+    # パターン: 電話番号、Telegram ID、Discord ID
     id_match = re.search(
         r'(?:sender|from|user|recipient|target)[:\s]+([\w@+\-.]+)',
         system_text, re.IGNORECASE,
@@ -84,10 +84,10 @@ def extract_user_message(converse_body: dict) -> tuple:
     if id_match:
         user_id = id_match.group(1)
 
-    # Fallback: derive from the full system prompt hash (ensures consistent tenant_id)
+    # フォールバック: システムプロンプトのハッシュから導出 (一貫した tenant_id を保証)
     if user_id == "unknown":
-        # Use a hash of the system prompt as a stable identifier
-        # This ensures the same "user" always maps to the same tenant
+        # システムプロンプトのハッシュを安定した識別子として使用
+        # これにより同じ「ユーザー」は常に同じテナントにマッピングされる
         prompt_hash = hashlib.md5(system_text[:500].encode()).hexdigest()[:12]
         user_id = f"sys-{prompt_hash}"
 
@@ -95,7 +95,7 @@ def extract_user_message(converse_body: dict) -> tuple:
 
 
 def build_converse_response(response_text: str, model_id: str = "proxy") -> dict:
-    """Build a Bedrock Converse API response from plain text."""
+    """プレーンテキストから Bedrock Converse API レスポンスを構築する。"""
     return {
         "output": {
             "message": {
@@ -116,13 +116,13 @@ def build_converse_response(response_text: str, model_id: str = "proxy") -> dict
 
 
 def build_converse_stream_response(response_text: str) -> list:
-    """Build Bedrock ConverseStream event chunks."""
+    """Bedrock ConverseStream イベントチャンクを構築する。"""
     events = []
     # messageStart
     events.append(json.dumps({"messageStart": {"role": "assistant"}}) + "\n")
     # contentBlockStart
     events.append(json.dumps({"contentBlockStart": {"start": {"text": ""}, "contentBlockIndex": 0}}) + "\n")
-    # contentBlockDelta with full text
+    # contentBlockDelta (全テキスト)
     events.append(json.dumps({
         "contentBlockDelta": {
             "delta": {"text": response_text},
@@ -160,7 +160,7 @@ class BedrockProxyHandler(BaseHTTPRequestHandler):
             self._respond(400, {"message": "Invalid JSON"})
             return
 
-        # Bedrock Converse API paths:
+        # Bedrock Converse API パス:
         # POST /model/<model-id>/converse
         # POST /model/<model-id>/converse-stream
         path = self.path
@@ -168,7 +168,7 @@ class BedrockProxyHandler(BaseHTTPRequestHandler):
 
         logger.info("Request: %s (stream=%s)", path, is_stream)
 
-        # Extract user message and routing info
+        # ユーザーメッセージとルーティング情報を抽出
         user_text, channel, user_id = extract_user_message(data)
         if not user_text:
             logger.warning("No user message found in request")
@@ -178,7 +178,7 @@ class BedrockProxyHandler(BaseHTTPRequestHandler):
 
         logger.info("Routing: channel=%s user=%s msg=%s", channel, user_id, str(user_text)[:60])
 
-        # Forward to Tenant Router
+        # テナントルーターへ転送
         try:
             tr_resp = requests.post(
                 f"{TENANT_ROUTER_URL}/route",
@@ -190,8 +190,8 @@ class BedrockProxyHandler(BaseHTTPRequestHandler):
                 timeout=300,
             )
             result = tr_resp.json()
-            # Tenant Router returns {"tenant_id": "...", "response": <agentcore_result>}
-            # AgentCore result is {"response": "text", "status": "success", ...}
+            # テナントルーターは {"tenant_id": "...", "response": <agentcore_result>} を返す
+            # AgentCore の結果は {"response": "text", "status": "success", ...}
             agent_result = result.get("response", {})
             if isinstance(agent_result, dict):
                 response_text = str(agent_result.get("response", agent_result.get("error", "No response")))
@@ -204,7 +204,7 @@ class BedrockProxyHandler(BaseHTTPRequestHandler):
         logger.info("Response: %s", str(response_text)[:80])
 
         if is_stream:
-            # Return as streaming events (newline-delimited JSON)
+            # ストリーミングイベントとして返す (改行区切り JSON)
             events = build_converse_stream_response(response_text)
             response_body = "".join(events).encode()
             self.send_response(200)
@@ -217,7 +217,7 @@ class BedrockProxyHandler(BaseHTTPRequestHandler):
             self._respond(200, resp)
 
     def do_GET(self):
-        # Health check
+        # ヘルスチェック
         if self.path == "/ping" or self.path == "/":
             self._respond(200, {"status": "healthy", "service": "bedrock-proxy"})
         else:

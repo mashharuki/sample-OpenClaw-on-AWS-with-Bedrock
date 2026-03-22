@@ -1,14 +1,14 @@
 """
-Input safety validation — defends against prompt injection and memory poisoning.
+入力安全性検証 — プロンプトインジェクションとメモリポイズニングを防御する。
 
-Based on Microsoft Security Blog guidance on running OpenClaw safely:
+OpenClaw を安全に実行するための Microsoft Security Blog ガイダンスに基づく:
 https://www.microsoft.com/en-us/security/blog/2026/02/19/running-openclaw-safely-identity-isolation-runtime-risk
 
-Two attack surfaces are defended:
-1. Memory poisoning: attacker injects instructions into session summaries that
-   persist across sessions and influence future agent behaviour.
-2. Prompt injection via message input: oversized or instruction-laden messages
-   that attempt to override the agent's system prompt.
+2つの攻撃面を防御する:
+1. メモリポイズニング: 攻撃者がセッションサマリーに命令を注入し、
+   セッションをまたいで将来のエージェントの動作に影響を与える。
+2. メッセージ入力経由のプロンプトインジェクション: エージェントのシステムプロンプトを
+   上書きしようとする過大または命令を含んだメッセージ。
 """
 
 import logging
@@ -18,9 +18,9 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Memory poisoning patterns
-# Phrases that indicate an attempt to inject persistent instructions into memory.
-# These are checked against session summaries BEFORE writing to AgentCore Memory.
+# メモリポイズニングパターン
+# メモリへの永続的な命令注入の試みを示すフレーズ。
+# AgentCore Memory に書き込む前にセッションサマリーに対してチェックされる。
 # ---------------------------------------------------------------------------
 _MEMORY_INJECTION_PATTERNS = [
     r"ignore\s+(all\s+)?(previous|prior|above)\s+instructions",
@@ -33,9 +33,9 @@ _MEMORY_INJECTION_PATTERNS = [
     r"pretend\s+(you\s+are|to\s+be)",
     r"your\s+new\s+(role|persona|identity|instructions)",
     r"from\s+now\s+on\s+you\s+(will|must|should)",
-    r"<\s*system\s*>",           # XML-style system tag injection
-    r"\[INST\]",                  # Llama instruction injection
-    r"###\s*instruction",         # Markdown instruction header injection
+    r"<\s*system\s*>",           # XML スタイルのシステムタグ注入
+    r"\[INST\]",                  # Llama 命令注入
+    r"###\s*instruction",         # Markdown 命令ヘッダー注入
 ]
 
 _COMPILED_MEMORY_PATTERNS = [
@@ -44,15 +44,15 @@ _COMPILED_MEMORY_PATTERNS = [
 ]
 
 # ---------------------------------------------------------------------------
-# Input validation limits
+# 入力バリデーションの制限値
 # ---------------------------------------------------------------------------
-MAX_MESSAGE_LENGTH = 32_000   # ~8k tokens, generous for legitimate use
+MAX_MESSAGE_LENGTH = 32_000   # 約 8k トークン、正当な利用には十分な余裕
 MAX_TOOL_NAME_LENGTH = 64
 MAX_RESOURCE_PATH_LENGTH = 512
 
 
 class SafetyViolation(Exception):
-    """Raised when input fails a safety check."""
+    """入力が安全チェックに失敗した場合に発生する。"""
 
     def __init__(self, reason: str, field: str):
         self.reason = reason
@@ -62,14 +62,13 @@ class SafetyViolation(Exception):
 
 def check_memory_safety(summary: str, tenant_id: str) -> bool:
     """
-    Check a session summary for prompt injection patterns before writing to memory.
+    メモリへ書き込む前にセッションサマリーのプロンプトインジェクションパターンを確認する。
 
-    Returns True if safe.
-    Raises SafetyViolation if a poisoning pattern is detected.
+    安全な場合は True を返す。
+    ポイズニングパターンが検出された場合は SafetyViolation を発生させる。
 
-    The check is intentionally conservative — false positives (blocking a
-    legitimate summary) are preferable to false negatives (persisting an
-    attacker-controlled instruction).
+    このチェックは意図的に保守的 — 誤検知 (正当なサマリーをブロック) は
+    見逃し (攻撃者制御の命令を永続化) より望ましい。
     """
     for pattern in _COMPILED_MEMORY_PATTERNS:
         match = pattern.search(summary)
@@ -89,10 +88,10 @@ def check_memory_safety(summary: str, tenant_id: str) -> bool:
 
 def validate_message(message: str) -> str:
     """
-    Validate and sanitise an incoming message.
+    受信メッセージを検証してサニタイズする。
 
-    - Truncates messages exceeding MAX_MESSAGE_LENGTH (logs a warning).
-    - Returns the (possibly truncated) message.
+    - MAX_MESSAGE_LENGTH を超えるメッセージを切り詰める (警告をログ出力)。
+    - (切り詰められた可能性のある) メッセージを返す。
     """
     if len(message) > MAX_MESSAGE_LENGTH:
         logger.warning(
@@ -106,8 +105,8 @@ def validate_message(message: str) -> str:
 
 def validate_tool_name(tool_name: str) -> str:
     """
-    Validate a tool name — must be alphanumeric + underscores, max 64 chars.
-    Raises SafetyViolation on invalid input.
+    ツール名を検証する — 英数字とアンダースコアのみ、最大 64 文字。
+    無効な入力の場合は SafetyViolation を発生させる。
     """
     if len(tool_name) > MAX_TOOL_NAME_LENGTH:
         raise SafetyViolation(
@@ -124,9 +123,9 @@ def validate_tool_name(tool_name: str) -> str:
 
 def validate_resource_path(resource: Optional[str]) -> Optional[str]:
     """
-    Validate a resource path — max 512 chars, no null bytes or path traversal.
-    Returns None if resource is None.
-    Raises SafetyViolation on invalid input.
+    リソースパスを検証する — 最大 512 文字、ヌルバイトやパストラバーサルは不可。
+    resource が None の場合は None を返す。
+    無効な入力の場合は SafetyViolation を発生させる。
     """
     if resource is None:
         return None

@@ -1,21 +1,21 @@
 """
-Enterprise Skill Loader for OpenClaw Multi-Tenant Platform.
+OpenClaw マルチテナントプラットフォーム向けエンタープライズスキルローダー。
 
-Loads skills from S3 based on tenant permissions and injects API keys
-from SSM Parameter Store as environment variables.
+テナントのパーミッションに基づいて S3 からスキルを読み込み、
+SSM パラメータストアの API キーを環境変数として注入する。
 
-Three-layer skill architecture (all zero-invasion to OpenClaw):
-  Layer 1: Built-in skills (Docker image, always available)
-  Layer 2: S3 hot-load skills (scripts, loaded at microVM startup)
-  Layer 3: Pre-built skill bundles (tar.gz from S3, loaded at startup)
+3層スキルアーキテクチャ (OpenClaw にゼロ侵食):
+  レイヤー1: ビルトインスキル (Docker イメージ、常に利用可能)
+  レイヤー2: S3 ホットロードスキル (スクリプト、microVM 起動時に読み込む)
+  レイヤー3: ビルド済みスキルバンドル (S3 の tar.gz、起動時に読み込む)
 
-Usage:
+使用方法:
   python skill_loader.py --tenant TENANT_ID --workspace /tmp/workspace \
     --bucket openclaw-tenants-xxx --stack openclaw-multitenancy --region us-east-1
 
-Output:
-  - Skills copied to {workspace}/skills/
-  - /tmp/skill_env.sh with export KEY=VALUE lines for API key injection
+出力:
+  - スキルが {workspace}/skills/ にコピーされる
+  - API キー注入用の export KEY=VALUE 行を含む /tmp/skill_env.sh
 """
 
 import argparse
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_tenant_roles(ssm, stack_name, tenant_id):
-    """Read tenant's role list from SSM permission profile."""
+    """SSM パーミッションプロファイルからテナントのロールリストを読み込む。"""
     try:
         resp = ssm.get_parameter(
             Name=f"/openclaw/{stack_name}/tenants/{tenant_id}/roles"
@@ -47,7 +47,7 @@ def get_tenant_roles(ssm, stack_name, tenant_id):
 
 
 def load_skill_manifest(skill_dir):
-    """Read skill.json manifest from a skill directory."""
+    """スキルディレクトリから skill.json マニフェストを読み込む。"""
     manifest_path = os.path.join(skill_dir, "skill.json")
     if not os.path.isfile(manifest_path):
         return None
@@ -60,21 +60,21 @@ def load_skill_manifest(skill_dir):
 
 
 def is_skill_allowed(manifest, tenant_roles):
-    """Check if a skill is allowed for the tenant based on role permissions."""
+    """ロールパーミッションに基づいてテナントにスキルが許可されているか確認する。"""
     if not manifest:
-        return True  # No manifest = no restrictions (backward compat)
+        return True  # マニフェストなし = 制限なし (後方互換性)
 
     permissions = manifest.get("permissions", {})
     allowed_roles = permissions.get("allowedRoles", ["*"])
     blocked_roles = permissions.get("blockedRoles", [])
 
-    # Check blocked first
+    # まずブロックを確認
     for role in tenant_roles:
         if role in blocked_roles:
             logger.info("Skill %s blocked for role %s", manifest.get("name"), role)
             return False
 
-    # Check allowed
+    # 次に許可を確認
     if "*" in allowed_roles:
         return True
     for role in tenant_roles:
@@ -86,12 +86,12 @@ def is_skill_allowed(manifest, tenant_roles):
 
 
 def load_layer2_skills(s3, bucket, stack_name, tenant_id, tenant_roles, workspace):
-    """Load Layer 2 skills from S3 (script-level, no npm deps)."""
+    """S3 からレイヤー2スキルを読み込む (スクリプトレベル、npm 依存なし)。"""
     skills_dir = os.path.join(workspace, "skills")
     os.makedirs(skills_dir, exist_ok=True)
     loaded = []
 
-    # 1. Pull shared skills
+    # 1. 共有スキルを取得
     shared_prefix = "_shared/skills/"
     try:
         result = subprocess.run(
@@ -104,7 +104,7 @@ def load_layer2_skills(s3, bucket, stack_name, tenant_id, tenant_roles, workspac
         logger.warning("Failed to sync shared skills: %s", e)
         return loaded
 
-    # 2. Filter by permissions and move to skills dir
+    # 2. パーミッションでフィルタしてスキルディレクトリに移動
     shared_tmp = os.path.join(skills_dir, "_shared_tmp")
     if os.path.isdir(shared_tmp):
         for skill_name in os.listdir(shared_tmp):
@@ -120,10 +120,10 @@ def load_layer2_skills(s3, bucket, stack_name, tenant_id, tenant_roles, workspac
                     logger.info("Layer 2 skill loaded: %s", skill_name)
             else:
                 logger.info("Layer 2 skill filtered: %s", skill_name)
-        # Cleanup tmp
+        # 一時ファイルを削除
         subprocess.run(["rm", "-rf", shared_tmp], capture_output=True)
 
-    # 3. Pull tenant-specific skills
+    # 3. テナント固有のスキルを取得
     tenant_prefix = f"{tenant_id}/skills/"
     try:
         subprocess.run(
@@ -139,12 +139,12 @@ def load_layer2_skills(s3, bucket, stack_name, tenant_id, tenant_roles, workspac
 
 
 def load_layer3_bundles(s3_client, ssm, bucket, stack_name, workspace):
-    """Load Layer 3 pre-built skill bundles from S3."""
+    """S3 からレイヤー3のビルド済みスキルバンドルを読み込む。"""
     skills_dir = os.path.join(workspace, "skills")
     os.makedirs(skills_dir, exist_ok=True)
     loaded = []
 
-    # Read skill catalog from SSM
+    # SSM からスキルカタログを読み込む
     catalog_path = f"/openclaw/{stack_name}/skill-catalog/"
     try:
         resp = ssm.get_parameters_by_path(Path=catalog_path, Recursive=False)
@@ -179,12 +179,12 @@ def load_layer3_bundles(s3_client, ssm, bucket, stack_name, workspace):
 
 
 def inject_skill_keys(ssm, stack_name, workspace, env_file="/tmp/skill_env.sh"):
-    """Read API keys from SSM and write export statements to env file."""
+    """SSM から API キーを読み込み、env ファイルに export 文を書き込む。"""
     skills_dir = os.path.join(workspace, "skills")
     env_lines = []
     injected = []
 
-    # Scan all loaded skills for manifests
+    # 読み込まれたすべてのスキルのマニフェストをスキャン
     if not os.path.isdir(skills_dir):
         return injected
 
@@ -200,13 +200,13 @@ def inject_skill_keys(ssm, stack_name, workspace, env_file="/tmp/skill_env.sh"):
         if not required_env:
             continue
 
-        # Try to load each required env var from SSM
+        # 各必須環境変数を SSM から読み込む
         for env_var in required_env:
             ssm_path = f"/openclaw/{stack_name}/skill-keys/{skill_name}/{env_var}"
             try:
                 resp = ssm.get_parameter(Name=ssm_path, WithDecryption=True)
                 value = resp["Parameter"]["Value"]
-                # Escape single quotes in value for shell safety
+                # シェル安全性のために値のシングルクォートをエスケープ
                 safe_value = value.replace("'", "'\\''")
                 env_lines.append(f"export {env_var}='{safe_value}'")
                 injected.append(f"{skill_name}/{env_var}")
@@ -214,7 +214,7 @@ def inject_skill_keys(ssm, stack_name, workspace, env_file="/tmp/skill_env.sh"):
             except ClientError:
                 logger.warning("Key not found in SSM: %s", ssm_path)
 
-    # Also load global skill keys (not tied to a specific skill)
+    # グローバルスキルキーも読み込む (特定のスキルに紐付かないもの)
     global_path = f"/openclaw/{stack_name}/skill-keys/_global/"
     try:
         resp = ssm.get_parameters_by_path(
@@ -228,12 +228,12 @@ def inject_skill_keys(ssm, stack_name, workspace, env_file="/tmp/skill_env.sh"):
             injected.append(f"_global/{env_var}")
             logger.info("Injected global key: %s", env_var)
     except ClientError:
-        pass  # No global keys configured
+        pass  # グローバルキーが設定されていない
 
-    # Write env file
+    # env ファイルを書き込む
     with open(env_file, "w") as f:
         f.write("#!/bin/sh\n")
-        f.write("# Auto-generated by skill_loader.py — do not edit\n")
+        f.write("# skill_loader.py により自動生成 — 編集しないこと\n")
         for line in env_lines:
             f.write(line + "\n")
 
@@ -255,22 +255,22 @@ def main():
 
     logger.info("=== Skill Loader START tenant=%s ===", args.tenant)
 
-    # Get tenant roles for permission filtering
+    # パーミッションフィルタリング用のテナントロールを取得
     roles = get_tenant_roles(ssm, args.stack, args.tenant)
 
-    # Layer 2: S3 hot-load skills
+    # レイヤー2: S3 ホットロードスキル
     l2 = load_layer2_skills(s3, args.bucket, args.stack, args.tenant, roles, args.workspace)
     logger.info("Layer 2 loaded: %s", l2 if l2 else "none")
 
-    # Layer 3: Pre-built skill bundles
+    # レイヤー3: ビルド済みスキルバンドル
     l3 = load_layer3_bundles(s3, ssm, args.bucket, args.stack, args.workspace)
     logger.info("Layer 3 loaded: %s", l3 if l3 else "none")
 
-    # Inject API keys from SSM
+    # SSM から API キーを注入
     keys = inject_skill_keys(ssm, args.stack, args.workspace)
     logger.info("Keys injected: %d", len(keys))
 
-    # Summary
+    # サマリー
     skills_dir = os.path.join(args.workspace, "skills")
     total = 0
     if os.path.isdir(skills_dir):

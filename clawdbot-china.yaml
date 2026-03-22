@@ -73,26 +73,26 @@ Parameters:
     Default: "Pro/deepseek-ai/DeepSeek-V3"
     Description: "SiliconFlow model ID. Pro/ models recommended for Marketplace subscribers (better performance and rate limits). Full model list: https://docs.siliconflow.cn/cn/userguide/models"
     AllowedValues:
-      # DeepSeek Pro (recommended for Marketplace subscribers)
+      # DeepSeek Pro（Marketplaceサブスクライバーに推奨）
       - "Pro/deepseek-ai/DeepSeek-V3"
       - "Pro/deepseek-ai/DeepSeek-R1"
       - "Pro/deepseek-ai/DeepSeek-V3.2"
       - "Pro/deepseek-ai/DeepSeek-V3.1-Terminus"
-      # DeepSeek standard (free tier, lower rate limits)
+      # DeepSeek 標準（無料枠、レート制限低め）
       - "deepseek-ai/DeepSeek-V3"
       - "deepseek-ai/DeepSeek-R1"
       - "deepseek-ai/DeepSeek-V3.2"
-      # Qwen (Alibaba)
+      # Qwen（Alibaba）
       - "Qwen/Qwen3-32B"
       - "Qwen/Qwen3-14B"
       - "Qwen/Qwen3-8B"
       - "Qwen/Qwen2.5-72B-Instruct"
-      # GLM (Zhipu AI)
+      # GLM（Zhipu AI）
       - "Pro/zai-org/GLM-4.7"
       - "zai-org/GLM-4.6"
       # Tencent
       - "tencent/Hunyuan-A13B-Instruct"
-      # Cost-effective distilled models
+      # コスト効率の高い蒸留モデル
       - "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
       - "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
 
@@ -217,7 +217,7 @@ Mappings:
     c7g.large: { Arch: "arm64" }
     c7g.xlarge: { Arch: "arm64" }
 
-  # Ubuntu 24.04 AMI IDs for AWS China regions (updated 2026-02-18)
+  # AWS中国リージョン向け Ubuntu 24.04 AMI ID（2026-02-18 更新）
   RegionAmiMap:
     cn-north-1:
       arm64: "ami-00f3db296e1803e0f"
@@ -227,7 +227,7 @@ Mappings:
       amd64: "ami-07c153df9422b4d5c"
 
 Resources:
-  # ==================== Wait Condition ====================
+  # ==================== 待機条件 ====================
   OpenClawWaitHandle:
     Type: AWS::CloudFormation::WaitConditionHandle
 
@@ -239,7 +239,7 @@ Resources:
       Timeout: '1200'
       Count: 1
 
-  # ==================== VPC and Network ====================
+  # ==================== VPC とネットワーク ====================
   OpenClawVPC:
     Type: AWS::EC2::VPC
     Condition: CreateNewVPC
@@ -307,7 +307,7 @@ Resources:
       SubnetId: !Ref PublicSubnet
       RouteTableId: !Ref PublicRouteTable
 
-  # VPC Endpoint Security Group
+  # VPC エンドポイントセキュリティグループ
   VPCEndpointSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Condition: CreateEndpoints
@@ -323,7 +323,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-vpce-sg"
 
-  # SSM VPC Endpoint (for Session Manager)
+  # SSM VPC エンドポイント（Session Manager 用）
   SSMVPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Condition: CreateEndpoints
@@ -363,7 +363,7 @@ Resources:
       SecurityGroupIds:
         - !Ref VPCEndpointSecurityGroup
 
-  # ==================== IAM Role ====================
+  # ==================== IAM ロール ====================
   OpenClawInstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -397,7 +397,7 @@ Resources:
       Roles:
         - !Ref OpenClawInstanceRole
 
-  # ==================== Security Group ====================
+  # ==================== セキュリティグループ ====================
   OpenClawSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -419,7 +419,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-sg"
 
-  # ==================== EC2 Instance ====================
+  # ==================== EC2 インスタンス ====================
   OpenClawInstance:
     Type: AWS::EC2::Instance
     Properties:
@@ -492,14 +492,14 @@ Resources:
           sudo -u ubuntu bash << 'UBUNTU_SCRIPT'
           cd ~
 
-          # Install NVM (download first, then execute — no curl piping)
+          # NVM をインストール（先にダウンロードしてから実行 — curl のパイプ渡し不使用）
           export NVM_SOURCE=https://gitee.com/mirrors/nvm.git
           NVM_VERSION="v0.40.1"
           for i in 1 2 3; do
             curl -fsSL "https://gitee.com/mirrors/nvm/raw/${!NVM_VERSION}/install.sh" -o /tmp/nvm-install.sh && break
             echo "NVM download via gitee failed, retrying $i/3..."
             sleep 5
-            # Fallback to GitHub on last try
+            # 最終試行時は GitHub へフォールバック
             if [ "$i" -eq "3" ]; then
               curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/${!NVM_VERSION}/install.sh" -o /tmp/nvm-install.sh || echo "NVM download failed"
             fi
@@ -510,18 +510,18 @@ Resources:
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
-          # Use npmmirror for faster Node.js download in China
+          # 中国での Node.js ダウンロード高速化のために npmmirror を使用
           export NVM_NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node
 
-          # Install Node.js 22
+          # Node.js 22 をインストール
           nvm install 22
           nvm use 22
           nvm alias default 22
 
-          # Use Chinese npm mirror
+          # 中国の npm ミラーを使用
           npm config set registry https://registry.npmmirror.com
 
-          # Install OpenClaw
+          # OpenClaw をインストール
           ARCH=$(uname -m)
           if [ "$ARCH" = "aarch64" ]; then
             echo "ARM64 detected, installing with --ignore-scripts..."
@@ -612,14 +612,14 @@ Resources:
           }
           JSONEOF
 
-          # Replace placeholders with actual values
+          # プレースホルダーを実際の値に置換
           sed -i "s/GATEWAY_TOKEN_PLACEHOLDER/$GATEWAY_TOKEN/g" /home/ubuntu/.openclaw/openclaw.json
           sed -i "s|API_BASE_URL_PLACEHOLDER|${LLMApiBaseUrl}|g" /home/ubuntu/.openclaw/openclaw.json
           sed -i "s|API_KEY_PLACEHOLDER|${LLMApiKey}|g" /home/ubuntu/.openclaw/openclaw.json
           sed -i "s|MODEL_ID_PLACEHOLDER|${LLMModel}|g" /home/ubuntu/.openclaw/openclaw.json
           chmod 600 /home/ubuntu/.openclaw/openclaw.json
 
-          # Install and start gateway
+          # ゲートウェイをインストールして起動
           for i in $(seq 1 15); do
             if [ -S /run/user/1000/bus ]; then
               echo "User systemd session ready"
@@ -637,7 +637,7 @@ Resources:
           systemctl --user start openclaw-gateway.service 2>/dev/null || { openclaw gateway & }
           '
 
-          # Wait for daemon to be ready
+          # デーモンの起動準備完了を待機
           echo "Waiting for OpenClaw daemon to start..."
           for i in $(seq 1 30); do
             if ss -tlnp 2>/dev/null | grep -q ':18789'; then
@@ -659,7 +659,7 @@ Resources:
             sleep 5
           fi
 
-          # Enable messaging channels
+          # メッセージングチャンネルを有効化
           echo "[8.5/9] Enabling messaging channels..."
           sudo -H -u ubuntu bash -c '
           export HOME=/home/ubuntu
@@ -671,7 +671,7 @@ Resources:
           openclaw plugins enable slack || echo "Slack plugin enable failed"
           '
 
-          # Save token to SSM Parameter Store (encrypted, never written to disk)
+          # トークンを SSM Parameter Store に保存（暗号化、ディスクへの書き込みなし）
           STACK_NAME="${AWS::StackName}"
           aws ssm put-parameter \
             --name "/openclaw/$STACK_NAME/gateway-token" \
@@ -680,7 +680,7 @@ Resources:
             --region $AWS_REGION \
             --overwrite || echo "Failed to save token to SSM"
 
-          # Save LLM API key to SSM Parameter Store (secure)
+          # LLM API キーを SSM Parameter Store に保存（セキュア）
           aws ssm put-parameter \
             --name "/openclaw/$STACK_NAME/llm-api-key" \
             --value "${LLMApiKey}" \
@@ -688,10 +688,10 @@ Resources:
             --region $AWS_REGION \
             --overwrite || echo "Failed to save LLM API key to SSM"
 
-          # Clear token from environment
+          # 環境変数からトークンを削除
           unset GATEWAY_TOKEN
 
-          # Save instance info (non-secret metadata only)
+          # インスタンス情報を保存（非秘密のメタデータのみ）
           echo "$INSTANCE_ID" > /home/ubuntu/.openclaw/instance_id.txt
           echo "$AWS_REGION" > /home/ubuntu/.openclaw/region.txt
           chown ubuntu:ubuntu /home/ubuntu/.openclaw/*.txt
@@ -710,7 +710,7 @@ Resources:
           chmod +x /home/ubuntu/ssm-portforward.sh
           chown ubuntu:ubuntu /home/ubuntu/ssm-portforward.sh
 
-          # Signal CloudFormation
+          # CloudFormation にシグナルを送信
           echo "[9/9] Signaling CloudFormation..."
           echo "SUCCESS" > /home/ubuntu/.openclaw/setup_status.txt
           echo "Setup completed: $(date)" >> /home/ubuntu/.openclaw/setup_status.txt

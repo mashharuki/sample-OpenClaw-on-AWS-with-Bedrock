@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OpenClaw Enterprise Multi-Tenant Architecture Diagram — Large Font"""
+"""OpenClaw エンタープライズ マルチテナント アーキテクチャ図 — 大きなフォント"""
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -49,20 +49,20 @@ def region(x,y,w,h, label):
         ax.text(x+0.5, y+h-0.5, label, fontsize=15, color='#232F3E',
                 fontweight='bold', alpha=0.7)
 
-# ── Title ──
+# ── タイトル ──
 ax.text(18, 23.3, 'OpenClaw Enterprise Multi-Tenant Architecture', ha='center',
         fontsize=28, fontweight='bold', color='#212121')
 ax.text(18, 22.7, 'EC2 Gateway + AgentCore Runtime + S3 Workspace Sync  |  Zero OpenClaw Modification',
         ha='center', fontsize=15, color='#78909C')
 
-# ── Users ──
+# ── ユーザー ──
 for name, x in [('WhatsApp',2),('Telegram',8),('Discord',14),('Slack',20),('Feishu',26)]:
     box(x, 20.5, 3.5, 1.2, C_USER, [(name, 16, 'bold')])
 
-# ── AWS Cloud ──
+# ── AWS クラウド ──
 region(0.5, 0.8, 35, 19.2, 'AWS Cloud')
 
-# ── EC2 Gateway ──
+# ── EC2 ゲートウェイ ──
 region(1.2, 13.0, 16.6, 6.5, '')
 ax.text(9.5, 19.0, 'EC2 Gateway (Always-On)', ha='center', fontsize=20,
         fontweight='bold', color=C_GW)
@@ -87,11 +87,12 @@ box(9.8, 13.4, 7.5, 2.0, '#26A69A', [
 ])
 
 # ── AgentCore Runtime ──
+
 region(1.2, 4.5, 16.6, 7.8, '')
 ax.text(9.5, 11.8, 'AgentCore Runtime  (Serverless, On-Demand)', ha='center',
         fontsize=18, fontweight='bold', color=C_AC)
 
-# microVM 1
+# microVM 1（テナント: wa__sarah）
 box(1.6, 4.9, 7.5, 6.2, C_AC, [], alpha=0.15)
 ax.text(5.35, 10.7, 'Firecracker microVM', ha='center', fontsize=15,
         fontweight='bold', color=C_AC)
@@ -110,7 +111,7 @@ box(2.0, 5.2, 6.7, 1.6, '#01579B', [
     ('SOUL.md  |  MEMORY.md  |  Skills', 12, 'normal'),
 ])
 
-# microVM 2
+# microVM 2（テナント: tg__alex）
 box(9.8, 4.9, 7.5, 6.2, C_AC, [], alpha=0.15)
 ax.text(13.55, 10.7, 'Firecracker microVM', ha='center', fontsize=15,
         fontweight='bold', color=C_AC)
@@ -129,7 +130,7 @@ box(10.2, 5.2, 6.7, 1.6, '#01579B', [
     ('SOUL.md  |  MEMORY.md  |  Skills', 12, 'normal'),
 ])
 
-# ── AWS Services (right side) ──
+# ── AWS サービス（右側） ──
 SX = 19.5
 SW = 7.2
 SH = 2.8

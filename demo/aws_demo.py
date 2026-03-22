@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
 """
-OpenClaw Multi-Tenant Platform — AWS Demo
+OpenClaw マルチテナントプラットフォーム — AWS デモ
 
-Runs on an EC2 instance with OpenClaw + Bedrock already deployed.
-Demonstrates the multi-tenant flow with REAL Bedrock model inference.
+OpenClaw + Bedrock がデプロイ済みの EC2 インスタンス上で実行されます。
+実際の Bedrock モデル推論を使ったマルチテナントフローをデモします。
 
-This script:
-  1. Starts the Agent Container server (server.py) on port 8080
-  2. Starts the Tenant Router on port 8090
-  3. Sends test messages as different tenants through the full pipeline
-  4. Shows real Bedrock responses with per-tenant permission enforcement
+このスクリプトの動作:
+  1. Agent Container サーバー (server.py) をポート 8080 で起動
+  2. Tenant Router をポート 8090 で起動
+  3. 異なるテナントとしてテストメッセージをパイプライン全体に送信
+  4. テナントごとの権限制御を伴う実際の Bedrock レスポンスを表示
 
-Prerequisites:
-  - EC2 instance with OpenClaw deployed (standard CloudFormation stack)
-  - Bedrock model access enabled
-  - Python 3.10+ with boto3, requests
+前提条件:
+  - OpenClaw がデプロイされた EC2 インスタンス（標準 CloudFormation スタック）
+  - Bedrock モデルアクセスが有効化されていること
+  - Python 3.10+ と boto3、requests がインストール済みであること
 
-Run on EC2:
+EC2 上での実行:
     sudo su - ubuntu
     cd /path/to/repo
     pip3 install requests boto3
     python3 demo/aws_demo.py
 
-Or run the setup script first:
+またはセットアップスクリプトを先に実行:
     bash demo/setup_aws_demo.sh
     python3 demo/aws_demo.py
 """
@@ -38,16 +38,16 @@ import signal
 from datetime import datetime, timezone
 
 # ---------------------------------------------------------------------------
-# Setup
+# セットアップ
 # ---------------------------------------------------------------------------
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO_ROOT, "agent-container"))
 sys.path.insert(0, os.path.join(REPO_ROOT, "auth-agent"))
 sys.path.insert(0, os.path.join(REPO_ROOT, "src", "gateway"))
 
-# Detect region from IMDS or env
+# IMDS または環境変数からリージョンを検出する
 def detect_region():
-    """Detect AWS region from IMDS (EC2) or environment."""
+    """IMDS (EC2) または環境変数から AWS リージョンを検出する。"""
     region = os.environ.get("AWS_REGION")
     if region:
         return region
@@ -76,7 +76,7 @@ AGENT_CONTAINER_PORT = 8080
 TENANT_ROUTER_PORT = 8090
 
 # ---------------------------------------------------------------------------
-# Colors
+# カラーコード
 # ---------------------------------------------------------------------------
 class C:
     HEADER = "\033[95m"
@@ -112,11 +112,11 @@ def warn(text):
 
 
 # ---------------------------------------------------------------------------
-# Step 1: Setup SSM permission profiles for demo tenants
+# ステップ 1: デモテナント用の SSM 権限プロファイルをセットアップする
 # ---------------------------------------------------------------------------
 
 def setup_tenant_profiles():
-    """Create demo tenant permission profiles in SSM Parameter Store."""
+    """SSM Parameter Store にデモテナントの権限プロファイルを作成する。"""
     import boto3
     ssm = boto3.client("ssm", region_name=AWS_REGION)
 
@@ -155,32 +155,32 @@ def setup_tenant_profiles():
 
 
 # ---------------------------------------------------------------------------
-# Step 2: Start Agent Container server
+# ステップ 2: Agent Container サーバーを起動する
 # ---------------------------------------------------------------------------
 
 _child_processes = []
 
 def start_agent_container():
-    """Start the Agent Container server.py on port 8080.
+    """Agent Container の server.py をポート 8080 で起動する。
 
-    This is the same server that runs inside AgentCore Runtime containers.
-    Here we run it directly on EC2 for the demo.
+    AgentCore Runtime コンテナ内で動作するサーバーと同じものです。
+    デモ用に EC2 上で直接実行します。
     """
     env = os.environ.copy()
     env["PORT"] = str(AGENT_CONTAINER_PORT)
     env["STACK_NAME"] = STACK_NAME
     env["AWS_REGION"] = AWS_REGION
 
-    # Use the Bedrock model from the existing OpenClaw config
+    # 既存の OpenClaw 設定から Bedrock モデルを使用する
     model_id = os.environ.get("BEDROCK_MODEL_ID", "")
     if not model_id:
-        # Try to read from OpenClaw config
+        # OpenClaw 設定から読み取りを試みる
         config_path = os.path.expanduser("~/.openclaw/openclaw.json")
         if os.path.exists(config_path):
             try:
                 with open(config_path) as f:
                     config = json.load(f)
-                # Extract model ID from config
+                # 設定からモデル ID を取得する
                 providers = config.get("models", {}).get("providers", {})
                 for provider in providers.values():
                     models = provider.get("models", [])
@@ -208,12 +208,12 @@ def start_agent_container():
 
 
 def start_tenant_router():
-    """Start the Tenant Router on port 8090."""
+    """Tenant Router をポート 8090 で起動する。"""
     env = os.environ.copy()
     env["ROUTER_PORT"] = str(TENANT_ROUTER_PORT)
     env["STACK_NAME"] = STACK_NAME
     env["AWS_REGION"] = AWS_REGION
-    # Point to local Agent Container instead of AgentCore Runtime
+    # AgentCore Runtime の代わりにローカルの Agent Container を指定する
     env["AGENT_CONTAINER_URL"] = f"http://localhost:{AGENT_CONTAINER_PORT}"
 
     router_path = os.path.join(REPO_ROOT, "src", "gateway", "tenant_router.py")
@@ -228,7 +228,7 @@ def start_tenant_router():
 
 
 def wait_for_service(port, name, timeout=60):
-    """Wait for an HTTP service to become ready."""
+    """HTTP サービスが準備完了になるまで待機する。"""
     import requests as req
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -245,16 +245,16 @@ def wait_for_service(port, name, timeout=60):
 
 
 # ---------------------------------------------------------------------------
-# Step 3: Send test messages through the pipeline
+# ステップ 3: パイプラインを通じてテストメッセージを送信する
 # ---------------------------------------------------------------------------
 
 def send_message(channel, user_id, message, persona):
-    """Send a message through the Tenant Router → Agent Container pipeline."""
+    """Tenant Router → Agent Container パイプラインを通じてメッセージを送信する。"""
     import requests as req
 
     print(f"\n  {C.BOLD}[{persona}]{C.END} via {channel}: \"{message}\"")
 
-    # Call Tenant Router
+    # Tenant Router を呼び出す
     try:
         resp = req.post(
             f"http://localhost:{TENANT_ROUTER_PORT}/route",
@@ -263,7 +263,7 @@ def send_message(channel, user_id, message, persona):
                 "user_id": user_id,
                 "message": message,
             },
-            timeout=120,  # Bedrock can take a while
+            timeout=120,  # Bedrock は時間がかかる場合がある
         )
 
         if resp.status_code == 200:
@@ -273,7 +273,7 @@ def send_message(channel, user_id, message, persona):
 
             ok(f"Tenant: {tenant_id}")
 
-            # Extract the actual text response
+            # 実際のテキストレスポンスを取得する
             if isinstance(response, dict):
                 choices = response.get("choices", [])
                 if choices:
@@ -298,11 +298,11 @@ def send_message(channel, user_id, message, persona):
 
 
 # ---------------------------------------------------------------------------
-# Cleanup
+# クリーンアップ
 # ---------------------------------------------------------------------------
 
 def cleanup():
-    """Terminate all child processes."""
+    """すべての子プロセスを終了させる。"""
     for proc in _child_processes:
         try:
             proc.terminate()
@@ -324,7 +324,7 @@ signal.signal(signal.SIGTERM, signal_handler)
 
 
 # ===========================================================================
-# MAIN
+# メイン
 # ===========================================================================
 
 def main():
@@ -334,7 +334,7 @@ def main():
     print(f"  This demo uses REAL Bedrock model inference.{C.END}")
 
     # ------------------------------------------------------------------
-    # Phase 1: Setup tenant profiles in SSM
+    # フェーズ 1: SSM にテナントプロファイルをセットアップする
     # ------------------------------------------------------------------
     section("Phase 1: Create tenant permission profiles in SSM")
     if not setup_tenant_profiles():
@@ -342,7 +342,7 @@ def main():
         return
 
     # ------------------------------------------------------------------
-    # Phase 2: Start services
+    # フェーズ 2: サービスを起動する
     # ------------------------------------------------------------------
     section("Phase 2: Start Agent Container + Tenant Router")
 
@@ -353,22 +353,22 @@ def main():
     info("Starting Tenant Router on port 8090...")
     router_proc = start_tenant_router()
 
-    # Wait for services
+    # サービスが準備完了になるまで待機する
     info("Waiting for services to be ready...")
 
-    # Tenant Router should be fast
+    # Tenant Router は素早く起動するはず
     if not wait_for_service(TENANT_ROUTER_PORT, "Tenant Router", timeout=15):
         fail("Tenant Router failed to start. Check logs.")
         cleanup()
         return
 
-    # Agent Container needs OpenClaw subprocess to start (slower)
+    # Agent Container は OpenClaw サブプロセスの起動が必要（より遅い）
     if not wait_for_service(AGENT_CONTAINER_PORT, "Agent Container", timeout=90):
         warn("Agent Container not ready via /ping. It may still be starting OpenClaw subprocess.")
         warn("Continuing anyway — first request may take longer...")
 
     # ------------------------------------------------------------------
-    # Phase 3: Send test messages
+    # フェーズ 3: テストメッセージを送信する
     # ------------------------------------------------------------------
     section("Phase 3: Multi-tenant message processing")
 
@@ -397,7 +397,7 @@ def main():
     )
 
     # ------------------------------------------------------------------
-    # Summary
+    # サマリー
     # ------------------------------------------------------------------
     banner("Demo Complete")
 
