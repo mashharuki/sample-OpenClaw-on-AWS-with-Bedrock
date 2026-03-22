@@ -14,7 +14,8 @@ English | [简体中文](README_CN.md) | 日本語
 
 問題は、セットアップ時に複数プロバイダーの API キー管理、VPN の設定、セキュリティ対策をすべて自分で担う必要があることです。
 
-このプロジェクトはそこを解決します。1 つの CloudFormation スタックで、以下をまとめて構築できます。
+このプロジェクトはそこを解決します。
+1 つの CloudFormation スタックで、以下をまとめて構築できます。
 
 - **Amazon Bedrock** によるモデル利用。10 種類のモデル、統一 API、IAM 認証を提供し、API キーは不要です
 - **Graviton ARM インスタンス** により、x86 より 20〜40% 安価です
@@ -381,7 +382,7 @@ openclaw gateway status
 - **このプロジェクト**: [GitHub Issues](https://github.com/aws-samples/sample-OpenClaw-on-AWS-with-Bedrock/issues)
 - **OpenClaw**: [GitHub Issues](https://github.com/openclaw/openclaw/issues) · [Discord](https://discord.gg/openclaw)
 - **AWS Bedrock**: [AWS re:Post](https://repost.aws/tags/bedrock)
-
+- [DeepWiki](https://deepwiki.com/mashharuki/sample-OpenClaw-on-AWS-with-Bedrock)
 ---
 
 **Built with Kiro** 🦞
