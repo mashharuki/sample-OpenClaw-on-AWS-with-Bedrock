@@ -1,11 +1,12 @@
 """
-Agent Container HTTP server for Amazon Bedrock AgentCore.
+Amazon Bedrock AgentCore 用エージェントコンテナ HTTP サーバー。
 
-Wraps `openclaw agent --session-id <tenant_id> --message <text> --json`
-as a subprocess for each /invocations request.
+各 /invocations リクエストに対して
+`openclaw agent --session-id <tenant_id> --message <text> --json`
+をサブプロセスとして実行します。
 
-Plan A: inject allowed tools into system prompt via SOUL.md prepend.
-Plan E: audit response for blocked tool usage.
+プランA: SOUL.md の先頭に許可ツールを追記してシステムプロンプトに注入。
+プランE: ブロックされたツールの使用についてレスポンスを監査。
 """
 import json
 import logging
@@ -25,7 +26,7 @@ from safety import validate_message
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-# Path to openclaw binary (nvm install on EC2, system install in container)
+# openclaw バイナリへのパス (EC2 では nvm でインストール、コンテナではシステムインストール)
 _OPENCLAW_CANDIDATES = [
     "/home/ubuntu/.nvm/versions/node/v22.22.1/bin/openclaw",
     "/usr/local/bin/openclaw",
@@ -51,7 +52,7 @@ logger.info("openclaw binary: %s", OPENCLAW_BIN)
 
 
 def _build_system_prompt(tenant_id: str) -> str:
-    """Plan A: build constraint text to prepend to SOUL.md."""
+    """プランA: SOUL.md の先頭に追加する制約テキストを構築する。"""
     try:
         profile = read_permission_profile(tenant_id)
         allowed = profile.get("tools", ["web_search"])
@@ -74,7 +75,7 @@ def _build_system_prompt(tenant_id: str) -> str:
 
 
 def _audit_response(tenant_id: str, response_text: str, allowed_tools: list) -> None:
-    """Plan E: scan response for blocked tool usage."""
+    """プランE: ブロックされたツールの使用についてレスポンスをスキャンする。"""
     matches = _TOOL_PATTERN.findall(response_text)
     if not matches:
         return
@@ -91,9 +92,9 @@ def _audit_response(tenant_id: str, response_text: str, allowed_tools: list) -> 
 
 def invoke_openclaw(tenant_id: str, message: str, timeout: int = 300, max_retries: int = 2) -> dict:
     """
-    Run openclaw agent CLI with automatic retry on transient failures.
-    Retries on: empty output, JSON parse errors, timeouts.
-    Does NOT retry on successful responses (even if the content is an error message).
+    openclaw エージェント CLI を実行し、一時的なエラー時に自動リトライする。
+    リトライ対象: 空の出力、JSON パースエラー、タイムアウト。
+    正常なレスポンス (内容がエラーメッセージでも) はリトライしない。
     """
     last_error = None
     for attempt in range(max_retries + 1):
@@ -113,13 +114,13 @@ def invoke_openclaw(tenant_id: str, message: str, timeout: int = 300, max_retrie
 
 def _invoke_openclaw_once(tenant_id: str, message: str, timeout: int = 300) -> dict:
     """
-    Run: openclaw agent --session-id <tenant_id> --message <message> --json
-    Returns parsed JSON result dict.
-    Runs as 'ubuntu' user if we're root (EC2 host) so openclaw config is accessible.
+    openclaw agent --session-id <tenant_id> --message <message> --json を実行する。
+    パース済みの JSON 結果辞書を返す。
+    openclaw 設定にアクセスできるよう、root の場合 (EC2 ホスト) は 'ubuntu' ユーザーで実行する。
     """
     env = os.environ.copy()
 
-    # Inject skill API keys from /tmp/skill_env.sh (written by skill_loader.py)
+    # /tmp/skill_env.sh (skill_loader.py が書き込む) からスキル API キーを注入
     skill_env_file = "/tmp/skill_env.sh"
     if os.path.isfile(skill_env_file):
         try:
@@ -127,15 +128,15 @@ def _invoke_openclaw_once(tenant_id: str, message: str, timeout: int = 300) -> d
                 for line in f:
                     line = line.strip()
                     if line.startswith("export ") and "=" in line:
-                        kv = line[7:]  # strip "export "
+                        kv = line[7:]  # "export " を除去
                         key, _, val = kv.partition("=")
-                        # Strip surrounding quotes
+                        # 両端のクォートを除去
                         val = val.strip("'\"")
                         env[key] = val
         except IOError:
             pass
 
-    # Ensure node is on PATH for nvm installs
+    # nvm でインストールした node を PATH に含める
     nvm_bin = "/home/ubuntu/.nvm/versions/node/v22.22.1/bin"
     if os.path.isdir(nvm_bin):
         env["PATH"] = nvm_bin + ":" + env.get("PATH", "")
@@ -150,10 +151,10 @@ def _invoke_openclaw_once(tenant_id: str, message: str, timeout: int = 300) -> d
         "--timeout", str(timeout),
     ]
 
-    # If running as root (EC2 host), sudo to ubuntu so openclaw config is accessible
-    # Use 'sudo -u ubuntu env KEY=VAL ...' and do NOT pass env= to subprocess
-    # (subprocess env= would override the sudo env vars)
-    run_env = None  # None = inherit current process env (used in container as ubuntu)
+    # root で動作中 (EC2 ホスト) の場合、openclaw 設定にアクセスできるよう ubuntu に sudo する
+    # 'sudo -u ubuntu env KEY=VAL ...' を使い、subprocess に env= を渡さない
+    # (subprocess の env= は sudo の環境変数を上書きしてしまうため)
+    run_env = None  # None = 現プロセスの環境を継承 (コンテナ内では ubuntu として動作)
     if os.geteuid() == 0 and os.path.isdir("/home/ubuntu"):
         path_val = env.get("PATH", "/usr/local/bin:/usr/bin:/bin")
         aws_region = env.get("AWS_REGION", "us-east-1")
@@ -165,10 +166,10 @@ def _invoke_openclaw_once(tenant_id: str, message: str, timeout: int = 300) -> d
             f"AWS_REGION={aws_region}",
             f"AWS_DEFAULT_REGION={aws_region}",
         ] + openclaw_cmd
-        run_env = None  # let sudo handle the environment
+        run_env = None  # sudo に環境変数を任せる
     else:
         cmd = openclaw_cmd
-        run_env = env  # pass env in container (running as ubuntu already)
+        run_env = env  # コンテナ内では env を渡す (すでに ubuntu として動作中)
 
     logger.info("Invoking openclaw tenant_id=%s cmd=%s", tenant_id, " ".join(cmd[:5]))
 
@@ -187,19 +188,19 @@ def _invoke_openclaw_once(tenant_id: str, message: str, timeout: int = 300) -> d
     stderr = result.stderr.strip()
 
     if stderr:
-        # openclaw logs info/warnings to stderr — log at WARNING for visibility
+        # openclaw は情報/警告を stderr に記録 — 視認性のため WARNING レベルでログ出力
         for line in stderr.splitlines():
             logger.warning("[openclaw stderr] %s", line)
 
     if not stdout:
         raise RuntimeError(f"openclaw returned empty output (exit={result.returncode})")
 
-    # Find the first JSON object in stdout (may have log lines before it)
+    # stdout の最初の JSON オブジェクトを探す (前にログ行がある場合もある)
     json_start = stdout.find('{')
     if json_start == -1:
         raise RuntimeError(f"No JSON in openclaw output: {stdout[:200]}")
 
-    # Use JSONDecoder to parse only the first complete JSON object
+    # JSONDecoder を使って最初の完全な JSON オブジェクトだけをパース
     decoder = json.JSONDecoder()
     try:
         data, _ = decoder.raw_decode(stdout, json_start)
@@ -232,7 +233,7 @@ class AgentCoreHandler(BaseHTTPRequestHandler):
             self._respond(400, {"error": "invalid json"})
             return
 
-        # Extract tenant_id from headers or payload
+        # ヘッダーまたはペイロードから tenant_id を取得
         _file_tenant = ""
         try:
             with open("/tmp/tenant_id") as f:
@@ -264,18 +265,18 @@ class AgentCoreHandler(BaseHTTPRequestHandler):
             data = invoke_openclaw(tenant_id, message, timeout=timeout)
             duration_ms = int(time.time() * 1000) - start_ms
 
-            # Extract text from openclaw JSON response
-            # Format: {"payloads": [{"text": "..."}], "meta": {...}}
+            # openclaw JSON レスポンスからテキストを取得
+            # 形式: {"payloads": [{"text": "..."}], "meta": {...}}
             payloads = data.get("payloads", [])
             response_text = " ".join(
                 p.get("text", "") for p in payloads if p.get("text")
             ).strip()
 
             if not response_text:
-                # Fallback: try top-level text field
+                # フォールバック: トップレベルの text フィールドを試みる
                 response_text = data.get("text", str(data))
 
-            # Plan E audit
+            # プランE 監査
             try:
                 profile = read_permission_profile(tenant_id)
                 allowed = profile.get("tools", ["web_search"])
@@ -283,7 +284,7 @@ class AgentCoreHandler(BaseHTTPRequestHandler):
                 allowed = ["web_search"]
             _audit_response(tenant_id, response_text, allowed)
 
-            # Extract model usage for observability
+            # オブザーバビリティのためにモデル使用状況を取得
             meta = data.get("meta", {})
             agent_meta = meta.get("agentMeta", {})
             model = agent_meta.get("model", "unknown")

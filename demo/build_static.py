@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
-"""Build a fully static index.html from console_ui.html + console.py mock data + architecture image."""
+"""console_ui.html + console.py モックデータ + アーキテクチャ画像から完全静的な index.html を生成します。"""
 import base64, json, os, re, sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(ROOT)
 
-# 1. Load HTML
+# 1. HTML を読み込む
 html_path = os.path.join(ROOT, "console_ui.html")
 html = open(html_path, encoding="utf-8").read()
 
-# 2. Load architecture image as base64
+# 2. アーキテクチャ画像を base64 として読み込む
 img_path = os.path.join(REPO, "images", "architecture-multitenant.drawio.png")
 if os.path.exists(img_path):
     with open(img_path, "rb") as f:
         img_b64 = base64.b64encode(f.read()).decode()
-    # Replace the /arch.png src with inline base64
+    # /arch.png の src をインライン base64 に置き換える
     html = html.replace('src="/arch.png"', f'src="data:image/png;base64,{img_b64}"')
     print(f"  Embedded architecture image ({len(img_b64)//1024}KB base64)")
 else:
     print(f"  WARNING: {img_path} not found, skipping image embed")
 
-# 3. Import mock data from console.py
+# 3. console.py からモックデータをインポートする
 sys.path.insert(0, ROOT)
 from console import TENANTS, AUDIT, APPROVALS, SKILLS, TASKS, TOPOLOGY, ALL_TOOLS, ALWAYS_BLOCKED, init, sim_resp
-init()  # populate AUDIT and APPROVALS
+init()  # AUDIT と APPROVALS を初期化する
 
-# Build all API responses
+# すべての API レスポンスを構築する
 api_data = {
     "/api/dashboard": {
         "tenants": len(TENANTS),
@@ -47,11 +47,11 @@ api_data = {
         "by_tenant": [{"id": k, "name": v["name"], "tokens": v["tokens_today"], "cost": round(v["tokens_today"] / 1000000 * 2.5, 2)} for k, v in TENANTS.items()],
     },
 }
-# Per-tenant endpoints
+# テナントごとのエンドポイント
 for k, v in TENANTS.items():
     api_data[f"/api/tenants/{k}"] = {"id": k, **v}
 
-# 4. Replace the fetch-based API helper with inline data
+# 4. fetch ベースの API ヘルパーをインラインデータに置き換える
 api_js = f"""
 const _API_DATA = {json.dumps(api_data, default=str)};
 const _TENANTS = {json.dumps(TENANTS, default=str)};
@@ -59,7 +59,7 @@ const _ALL_TOOLS = {json.dumps(ALL_TOOLS)};
 const _ALWAYS_BLOCKED = {json.dumps(ALWAYS_BLOCKED)};
 
 const A = async (p, m='GET', b=null) => {{
-  // Static mode: return inline data for GET, simulate for POST/PUT
+  // 静的モード: GET にはインラインデータを返し、POST/PUT はシミュレートする
   if (m === 'GET' && _API_DATA[p]) return _API_DATA[p];
   if (m === 'GET' && p.startsWith('/api/tenants/')) {{
     const id = p.split('/api/tenants/')[1];
@@ -121,13 +121,13 @@ const A = async (p, m='GET', b=null) => {{
 }};
 """
 
-# Replace the original A= fetch helper — find the complete function
-# The original is: const A=async(p,m='GET',b=null)=>{...};
-# It's a single line ending with .json()};
+# 元の A= fetch ヘルパーを置き換える — 関数全体を検索する
+# 元の形式: const A=async(p,m='GET',b=null)=>{...};
+# .json()}; で終わる1行
 orig_marker = "const A=async(p,m='GET',b=null)=>"
 idx = html.find(orig_marker)
 if idx >= 0:
-    # Find the end of this statement — it ends with .json()};
+    # この文の終端を探す — .json()}; で終わる
     end_marker = ".json()};"
     end_idx = html.find(end_marker, idx)
     if end_idx >= 0:
@@ -139,7 +139,7 @@ if idx >= 0:
 else:
     print("  WARNING: Could not find fetch API pattern to replace")
 
-# 5. Write output
+# 5. 出力を書き込む
 out_dir = os.path.join(ROOT, "static")
 os.makedirs(out_dir, exist_ok=True)
 out_path = os.path.join(out_dir, "index.html")

@@ -1,17 +1,17 @@
 """
-OpenClaw Enterprise Admin Console — Backend API
+OpenClaw エンタープライズ管理コンソール — バックエンド API
 
-FastAPI server that bridges the Admin Console frontend with AWS services.
-Runs on EC2 alongside the Gateway, Proxy, and Router.
+Admin Console フロントエンドと AWS サービスを橋渡しする FastAPI サーバー。
+Gateway、Proxy、Router と並行して EC2 上で動作する。
 
-Usage:
+使用方法:
   uvicorn main:app --host 0.0.0.0 --port 8099
-  # Or: python main.py
+  # または: python main.py
 
-Env vars:
-  STACK_NAME (default: openclaw-multitenancy)
-  AWS_REGION (default: us-east-1)
-  S3_BUCKET  (default: auto-detect from stack)
+環境変数:
+  STACK_NAME (デフォルト: openclaw-multitenancy)
+  AWS_REGION (デフォルト: us-east-1)
+  S3_BUCKET  (デフォルト: スタックから自動検出)
 """
 
 import json
@@ -35,7 +35,7 @@ S3_BUCKET = os.environ.get("S3_BUCKET", "")
 app = FastAPI(title="OpenClaw Admin API", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# AWS clients (lazy init)
+# AWS クライアント (遅延初期化)
 _ssm = None
 _s3 = None
 _cw = None
@@ -67,7 +67,7 @@ def get_bucket():
 
 
 # =========================================================================
-# Dashboard
+# ダッシュボード
 # =========================================================================
 
 @app.get("/api/v1/dashboard")
@@ -82,13 +82,13 @@ def dashboard():
         "tokens": sum(t.get("tokens_today", 0) for t in tenants),
         "cost_today": round(sum(t.get("tokens_today", 0) for t in tenants) / 1_000_000 * 2.5, 4),
         "pending": pending,
-        "violations": 0,  # TODO: CloudWatch query
+        "violations": 0,  # TODO: CloudWatch クエリ
         "skills_total": len(list_skills_from_s3()),
     }
 
 
 # =========================================================================
-# Tenants
+# テナント
 # =========================================================================
 
 class TenantUpdate(BaseModel):
@@ -97,7 +97,7 @@ class TenantUpdate(BaseModel):
     soul_template: Optional[str] = None
 
 def list_tenants_from_ssm():
-    """List all tenants from SSM parameter path."""
+    """SSM パラメータパスからすべてのテナントを一覧表示する。"""
     tenants = []
     path = f"/openclaw/{STACK_NAME}/tenants/"
     try:
@@ -105,7 +105,7 @@ def list_tenants_from_ssm():
         for page in paginator.paginate(Path=path, Recursive=True):
             for param in page.get("Parameters", []):
                 name = param["Name"]
-                # Parse: /openclaw/{stack}/tenants/{tenant_id}/permissions
+                # パース: /openclaw/{stack}/tenants/{tenant_id}/permissions
                 parts = name.replace(path, "").split("/")
                 if len(parts) >= 2 and parts[1] == "permissions":
                     tid = parts[0]
@@ -154,7 +154,7 @@ def update_tenant(tenant_id: str, body: TenantUpdate):
         profile = {}
 
     if body.tools is not None:
-        # Filter out always-blocked tools
+        # 常にブロックされるツールを除外
         blocked = {"install_skill", "load_extension", "eval"}
         profile["tools"] = [t for t in body.tools if t not in blocked]
     if body.roles is not None:
@@ -167,20 +167,20 @@ def update_tenant(tenant_id: str, body: TenantUpdate):
 
 
 # =========================================================================
-# Skills
+# スキル
 # =========================================================================
 
 def list_skills_from_s3():
-    """List skills from S3 _shared/skills/ and SSM skill catalog."""
+    """S3 の _shared/skills/ と SSM スキルカタログからスキルを一覧表示する。"""
     bucket = get_bucket()
     skills = []
 
-    # Layer 2: S3 hot-load skills
+    # レイヤー 2: S3 ホットロードスキル
     try:
         resp = s3().list_objects_v2(Bucket=bucket, Prefix="_shared/skills/", Delimiter="/")
         for prefix in resp.get("CommonPrefixes", []):
             skill_name = prefix["Prefix"].rstrip("/").split("/")[-1]
-            # Try to read manifest
+            # マニフェストを読み込もうとする
             manifest = {}
             try:
                 obj = s3().get_object(Bucket=bucket, Key=f"_shared/skills/{skill_name}/skill.json")
@@ -202,7 +202,7 @@ def list_skills_from_s3():
     except ClientError:
         pass
 
-    # Layer 3: SSM skill catalog (pre-built bundles)
+    # レイヤー 3: SSM スキルカタログ (ビルド済みバンドル)
     try:
         resp = ssm().get_parameters_by_path(
             Path=f"/openclaw/{STACK_NAME}/skill-catalog/", Recursive=False
@@ -233,7 +233,7 @@ def get_skills():
 
 @app.get("/api/v1/skills/{skill_id}/keys")
 def get_skill_keys(skill_id: str):
-    """List API keys for a skill (masked values)."""
+    """スキルの API キーを一覧表示する (値はマスク済み)。"""
     keys = []
     path = f"/openclaw/{STACK_NAME}/skill-keys/{skill_id}/"
     try:
@@ -251,11 +251,11 @@ def get_skill_keys(skill_id: str):
 
 
 # =========================================================================
-# Approvals
+# 承認
 # =========================================================================
 
 def list_approvals_from_ssm(status: str = "all"):
-    """Read approvals from SSM."""
+    """SSM から承認情報を読み込む。"""
     approvals = []
     path = f"/openclaw/{STACK_NAME}/approvals/"
     try:
@@ -303,12 +303,12 @@ def reject_request(approval_id: str):
 
 
 # =========================================================================
-# Audit Log
+# 監査ログ
 # =========================================================================
 
 @app.get("/api/v1/audit")
 def get_audit(limit: int = 20, tenant: Optional[str] = None):
-    """Query audit events from CloudWatch Logs."""
+    """CloudWatch Logs から監査イベントを照会する。"""
     events = []
     runtime_id = os.environ.get("AGENTCORE_RUNTIME_ID", "")
     log_group = f"/aws/bedrock-agentcore/runtimes/{runtime_id}-DEFAULT" if runtime_id else f"/openclaw/{STACK_NAME}/agents"
@@ -316,7 +316,7 @@ def get_audit(limit: int = 20, tenant: Optional[str] = None):
     try:
         kwargs = {
             "logGroupName": log_group,
-            "startTime": int((time.time() - 86400) * 1000),  # last 24h
+            "startTime": int((time.time() - 86400) * 1000),  # 過去 24 時間
             "limit": limit,
             "interleaved": True,
         }
@@ -338,19 +338,19 @@ def get_audit(limit: int = 20, tenant: Optional[str] = None):
             except (json.JSONDecodeError, KeyError):
                 pass
     except ClientError as e:
-        # Log group might not exist yet
+        # ロググループがまだ存在しない可能性がある
         pass
 
     return {"events": events}
 
 
 # =========================================================================
-# Usage & Cost
+# 使用量とコスト
 # =========================================================================
 
 @app.get("/api/v1/usage/tenants")
 def get_usage_tenants():
-    """Per-tenant token usage (from SSM or CloudWatch)."""
+    """テナントごとのトークン使用量 (SSM または CloudWatch から取得)。"""
     tenants = list_tenants_from_ssm()
     return {
         "by_tenant": [
@@ -370,14 +370,14 @@ def get_usage_tenants():
 
 @app.get("/api/v1/usage/calculate")
 def calculate_cost(users: int = 50, msgs_per_day: int = 100, model: str = "nova-lite"):
-    """Interactive cost calculator."""
+    """インタラクティブなコスト計算機。"""
     rates = {
         "nova-lite": {"input": 0.30, "output": 2.50, "name": "Nova 2 Lite"},
         "claude-sonnet": {"input": 3.00, "output": 15.00, "name": "Claude Sonnet 4.5"},
         "nova-pro": {"input": 0.80, "output": 3.20, "name": "Nova Pro"},
     }
     r = rates.get(model, rates["nova-lite"])
-    avg_input = 500  # tokens per message
+    avg_input = 500  # メッセージあたりのトークン数
     avg_output = 200
     daily_input = users * msgs_per_day * avg_input
     daily_output = users * msgs_per_day * avg_output
@@ -396,13 +396,13 @@ def calculate_cost(users: int = 50, msgs_per_day: int = 100, model: str = "nova-
 
 
 # =========================================================================
-# Security
+# セキュリティ
 # =========================================================================
 
 @app.get("/api/v1/security/summary")
 def security_summary():
     return {
-        "plan_a_blocks": 0,  # TODO: CloudWatch metric query
+        "plan_a_blocks": 0,  # TODO: CloudWatch メトリクスクエリ
         "plan_e_catches": 0,
         "injection_attempts": 0,
         "compliance_status": "ready",
@@ -417,7 +417,7 @@ def security_summary():
 
 
 # =========================================================================
-# Playground
+# プレイグラウンド
 # =========================================================================
 
 class PlaygroundMessage(BaseModel):
@@ -426,11 +426,11 @@ class PlaygroundMessage(BaseModel):
 
 @app.post("/api/v1/playground/send")
 def playground_send(body: PlaygroundMessage):
-    """Forward message to Tenant Router for real execution."""
+    """実際の実行のためにテナントルーターへメッセージを転送する。"""
     import requests
     router_url = os.environ.get("TENANT_ROUTER_URL", "http://127.0.0.1:8090")
     try:
-        # Get tenant profile for pipeline details
+        # パイプライン詳細のためにテナントプロファイルを取得
         profile = {}
         try:
             resp = ssm().get_parameter(
@@ -440,7 +440,7 @@ def playground_send(body: PlaygroundMessage):
         except Exception:
             pass
 
-        # Forward to router
+        # ルーターへ転送
         r = requests.post(
             f"{router_url}/route",
             json={"channel": "playground", "user_id": body.tenant_id, "message": body.message},
@@ -460,12 +460,12 @@ def playground_send(body: PlaygroundMessage):
 
 
 # =========================================================================
-# Settings / Services
+# 設定 / サービス
 # =========================================================================
 
 @app.get("/api/v1/settings/services")
 def get_services():
-    """Check systemd service status."""
+    """systemd サービスのステータスを確認する。"""
     services = {}
     for svc in ["openclaw-gateway", "openclaw-proxy", "openclaw-router"]:
         try:
@@ -488,7 +488,7 @@ def get_model():
 
 
 # =========================================================================
-# Startup
+# 起動
 # =========================================================================
 
 if __name__ == "__main__":

@@ -1,11 +1,11 @@
 """
-AgentCore Memory — optional cloud persistence layer for cross-session memory.
+AgentCore メモリ — セッション横断メモリ向けオプションのクラウド永続化レイヤー。
 
-openclaw's native memory (Markdown + SQLite) continues to work within the
-container lifecycle.  This module provides the *optional* AgentCore Memory
-integration that persists summaries to AWS so they survive container teardown.
+openclaw のネイティブメモリ (Markdown + SQLite) はコンテナのライフサイクル内で
+引き続き機能する。このモジュールは、コンテナが破棄されても残るよう AWS に
+サマリーを永続化する *オプションの* AgentCore Memory 統合を提供する。
 
-Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7
+要件: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7
 """
 
 import logging
@@ -20,16 +20,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 logger = logging.getLogger(__name__)
 
-# Memory store ID from environment (requirement 6.1)
+# 環境変数からメモリストア ID を取得 (要件 6.1)
 MEMORY_STORE_ID = os.environ.get("MEMORY_STORE_ID", "default")
 
 
 def _memory_client():
     """
-    Factory for the bedrock-agentcore-memory boto3 client.
+    bedrock-agentcore-memory boto3 クライアントのファクトリ。
 
-    Using a factory (rather than a module-level singleton) makes the client
-    easy to mock in tests — callers can monkeypatch `memory._memory_client`.
+    モジュールレベルのシングルトンではなくファクトリを使うことで、
+    テストでのモックが容易になる — 呼び出し元が `memory._memory_client` を monkeypatch できる。
     """
     return boto3.client(
         "bedrock-agentcore-memory",
@@ -38,18 +38,18 @@ def _memory_client():
 
 
 def _namespace(tenant_id: str) -> str:
-    """Return the Memory namespace for a tenant (requirement 6.1)."""
+    """テナントのメモリ名前空間を返す (要件 6.1)。"""
     return f"tenant_{tenant_id}"
 
 
 async def load_memory_on_session_start(tenant_id: str) -> Optional[str]:
     """
-    Retrieve historical memory summaries for *tenant_id* at session start.
+    セッション開始時に *tenant_id* の過去のメモリサマリーを取得する。
 
-    On ANY exception the function logs a WARNING and returns None so that the
-    session continues without memory context (graceful degradation, req 6.6).
+    どんな例外でも WARNING をログ出力し None を返すことで、
+    セッションはメモリコンテキストなしで継続する (グレースフルデグレード, 要件 6.6)。
 
-    Requirements: 6.2, 6.6
+    要件: 6.2, 6.6
     """
     try:
         client = _memory_client()
@@ -66,20 +66,19 @@ async def load_memory_on_session_start(tenant_id: str) -> Optional[str]:
             tenant_id,
             e,
         )
-        return None  # graceful degradation — session continues without memory
+        return None  # グレースフルデグレード — セッションはメモリなしで継続
 
 
 async def save_memory_on_session_end(tenant_id: str, session_summary: str) -> None:
     """
-    Persist *session_summary* to the tenant's Memory namespace after a session.
+    セッション終了後に *session_summary* をテナントのメモリ名前空間に永続化する。
 
-    Runs a memory-poisoning safety check before writing. If the summary contains
-    prompt-injection patterns, it is discarded and the failure is logged — the
-    response is not affected (requirement 6.6).
+    書き込み前にメモリポイズニング安全チェックを実行する。サマリーにプロンプトインジェクション
+    パターンが含まれている場合は破棄して失敗をログ出力する — レスポンスには影響しない (要件 6.6)。
 
-    Requirements: 6.3, 6.6
+    要件: 6.3, 6.6
     """
-    # Safety check: reject summaries containing injection patterns
+    # 安全チェック: インジェクションパターンを含むサマリーを拒否
     try:
         from safety import check_memory_safety
         check_memory_safety(session_summary, tenant_id)
@@ -89,7 +88,7 @@ async def save_memory_on_session_end(tenant_id: str, session_summary: str) -> No
             tenant_id,
             safety_err,
         )
-        return  # Do not write poisoned content
+        return  # ポイズニングされたコンテンツは書き込まない
 
     try:
         client = _memory_client()
@@ -114,12 +113,12 @@ async def save_memory_on_session_end(tenant_id: str, session_summary: str) -> No
 
 async def clear_tenant_memory(tenant_id: str) -> bool:
     """
-    Clear all memory entries for *tenant_id* (supports the ``/memory clear``
-    command, requirement 6.7).
+    *tenant_id* のすべてのメモリエントリをクリアする (``/memory clear``
+    コマンドをサポート、要件 6.7)。
 
-    Returns True on success, False on failure (failure is logged at ERROR).
+    成功時は True、失敗時は False を返す (失敗は ERROR レベルでログ出力)。
 
-    Requirements: 6.7
+    要件: 6.7
     """
     try:
         client = _memory_client()

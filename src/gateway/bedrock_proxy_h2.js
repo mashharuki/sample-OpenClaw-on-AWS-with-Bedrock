@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 /**
- * Bedrock Converse API HTTP/2 Proxy for OpenClaw Multi-Tenant Platform.
+ * OpenClaw マルチテナントプラットフォーム向け Bedrock Converse API HTTP/2 プロキシ。
  *
- * Intercepts AWS SDK Bedrock Converse API calls (HTTP/2) from OpenClaw Gateway,
- * extracts user message, forwards to Tenant Router -> AgentCore -> microVM,
- * returns response in Bedrock Converse API format.
+ * OpenClaw Gateway からの AWS SDK Bedrock Converse API 呼び出し (HTTP/2) をインターセプトし、
+ * ユーザーメッセージを抽出して Tenant Router -> AgentCore -> microVM へ転送し、
+ * Bedrock Converse API フォーマットでレスポンスを返す。
  *
- * Cold-start optimization (fast-path):
- *   When a tenant's microVM is cold, the proxy responds in ~2-3s via a direct
- *   Bedrock Converse call (no SOUL.md/memory/skills) while asynchronously
- *   triggering the full AgentCore pipeline to pre-warm the microVM.
- *   Subsequent messages use the warm microVM with full OpenClaw capabilities.
+ * コールドスタート最適化 (高速パス):
+ *   テナントの microVM がコールド状態の場合、プロキシは SOUL.md/メモリ/スキルなしの
+ *   直接 Bedrock Converse 呼び出しにより約 2-3 秒で応答する。その間、非同期で
+ *   完全な AgentCore パイプラインをトリガーして microVM を事前ウォームアップする。
+ *   次回以降のメッセージは完全な OpenClaw 機能を持つウォームな microVM を使用する。
  *
- * Usage:
+ * 使用方法:
  *   TENANT_ROUTER_URL=http://127.0.0.1:8090 node bedrock_proxy_h2.js
- *   Then set: AWS_ENDPOINT_URL_BEDROCK_RUNTIME=http://localhost:8091
+ *   次に設定: AWS_ENDPOINT_URL_BEDROCK_RUNTIME=http://localhost:8091
  */
 
 const http2 = require('node:http2');
@@ -28,12 +28,12 @@ const TENANT_ROUTER_URL = process.env.TENANT_ROUTER_URL || 'http://127.0.0.1:809
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID || 'global.amazon.nova-2-lite-v1:0';
 
-// Fast-path: enable/disable via env var (default: enabled)
+// 高速パス: 環境変数で有効/無効切り替え (デフォルト: 有効)
 const FAST_PATH_ENABLED = process.env.FAST_PATH_ENABLED !== 'false';
-// Tenant state expiry: after this many ms without activity, tenant goes back to cold
-// AgentCore idle timeout is 15 min, so we use 20 min to be safe
+// テナント状態の有効期限: この時間 (ms) 活動がないとテナントはコールドに戻る
+// AgentCore のアイドルタイムアウトは 15 分のため、安全のため 20 分を使用
 const TENANT_WARM_TTL_MS = parseInt(process.env.TENANT_WARM_TTL_MS || '1200000');
-// Warming timeout: how long to wait for Tenant Router before falling back to fast-path
+// ウォーミングタイムアウト: 高速パスにフォールバックする前にテナントルーターを待つ時間
 const WARMING_TIMEOUT_MS = parseInt(process.env.WARMING_TIMEOUT_MS || '8000');
 
 function log(msg) {
@@ -41,10 +41,10 @@ function log(msg) {
 }
 
 // =============================================================================
-// Tenant State Management
+// テナント状態管理
 // =============================================================================
 
-// States: 'cold' -> 'warming' -> 'warm' -> (TTL expires) -> 'cold'
+// 状態遷移: 'cold' -> 'warming' -> 'warm' -> (TTL 期限切れ) -> 'cold'
 const tenantState = new Map();
 
 function getTenantKey(channel, userId) {
@@ -54,7 +54,7 @@ function getTenantKey(channel, userId) {
 function getTenantStatus(key) {
   const entry = tenantState.get(key);
   if (!entry) return 'cold';
-  // Check TTL expiry
+  // TTL 期限切れを確認
   if (Date.now() - entry.lastSeen > TENANT_WARM_TTL_MS) {
     tenantState.delete(key);
     return 'cold';
@@ -71,7 +71,7 @@ function touchTenant(key) {
   if (entry) entry.lastSeen = Date.now();
 }
 
-// Periodic cleanup of expired entries (every 5 min)
+// 期限切れエントリの定期クリーンアップ (5 分ごと)
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of tenantState) {
@@ -82,7 +82,7 @@ setInterval(() => {
 }, 300000);
 
 // =============================================================================
-// Fast-Path: Direct Bedrock Converse API call (no OpenClaw, no SOUL.md)
+// 高速パス: Bedrock Converse API への直接呼び出し (OpenClaw・SOUL.md なし)
 // =============================================================================
 
 let bedrockClient = null;
@@ -92,9 +92,9 @@ async function initBedrockClient() {
   try {
     const { BedrockRuntimeClient, ConverseCommand } = require('@aws-sdk/client-bedrock-runtime');
     bedrockClient = new BedrockRuntimeClient({ region: AWS_REGION });
-    // Store ConverseCommand on the client for later use
+    // ConverseCommand を後で使用するためにクライアントに保存
     bedrockClient._ConverseCommand = ConverseCommand;
-    log('Bedrock SDK client initialized for fast-path');
+    log('Bedrock SDK クライアントを高速パス用に初期化しました');
     return bedrockClient;
   } catch (e) {
     log(`Bedrock SDK not available (fast-path disabled): ${e.message}`);
@@ -123,7 +123,7 @@ async function fastPathBedrock(userText) {
 }
 
 // =============================================================================
-// Message Extraction (unchanged from original)
+// メッセージ抽出 (オリジナルから変更なし)
 // =============================================================================
 
 function extractUserMessage(body) {
@@ -146,7 +146,7 @@ function extractUserMessage(body) {
   let channel = 'unknown';
   let userId = 'unknown';
 
-  // Primary: extract from user message text
+  // 第一候補: ユーザーメッセージテキストから抽出
   const slackDm = userText.match(/Slack DM from ([\w]+):/i);
   const slackChan = userText.match(/Slack (?:message )?in #([\w-]+).*?from ([\w]+):/i);
   const waDm = userText.match(/WhatsApp (?:message |DM )?from ([\w+\-.]+):/i);
@@ -165,7 +165,7 @@ function extractUserMessage(body) {
   else if (dcChan) { channel = 'discord'; userId = 'chan_' + dcChan[1] + '_' + dcChan[2]; }
   else if (dcDm) { channel = 'discord'; userId = 'dm_' + dcDm[1]; }
 
-  // Fallback: system prompt regex
+  // フォールバック: システムプロンプトの正規表現
   if (userId === 'unknown') {
     const systemText = systemParts
       .map(p => (typeof p === 'string' ? p : p.text || ''))
@@ -183,7 +183,7 @@ function extractUserMessage(body) {
 }
 
 // =============================================================================
-// Tenant Router Forwarding
+// テナントルーターへの転送
 // =============================================================================
 
 function forwardToTenantRouter(channel, userId, message) {
@@ -217,10 +217,10 @@ function forwardToTenantRouter(channel, userId, message) {
 }
 
 /**
- * Fire-and-forget: trigger Tenant Router to start microVM prewarming.
- * Uses a lightweight warmup message instead of the user's actual message
- * to avoid polluting OpenClaw's conversation history with a "ghost" message.
- * Does not wait for response. Errors are logged and swallowed.
+ * ファイア・アンド・フォーゲット: テナントルーターに microVM の事前ウォームアップを開始させる。
+ * OpenClaw の会話履歴を「ゴーストメッセージ」で汚染しないよう、
+ * ユーザーの実際のメッセージの代わりに軽量なウォームアップメッセージを使用する。
+ * レスポンスを待たない。エラーはログに記録して無視する。
  */
 const WARMUP_MESSAGE = '[SYSTEM] Session warmup - please respond with OK';
 
@@ -240,8 +240,8 @@ function prewarmTenantRouter(channel, userId) {
 }
 
 /**
- * Try Tenant Router with a timeout. If it responds in time, great.
- * If not, return null so caller can fall back to fast-path.
+ * タイムアウト付きでテナントルーターを試みる。時間内に応答すれば成功。
+ * 応答がなければ null を返して呼び出し元が高速パスにフォールバックできるようにする。
  */
 function tryTenantRouterWithTimeout(channel, userId, message, timeoutMs) {
   return new Promise((resolve) => {
@@ -260,14 +260,14 @@ function tryTenantRouterWithTimeout(channel, userId, message, timeoutMs) {
 }
 
 // =============================================================================
-// Core Request Router (fast-path + warm path)
+// コアリクエストルーター (高速パス + ウォームパス)
 // =============================================================================
 
 /**
- * Route a request based on tenant state:
- *   warm    -> forward to Tenant Router (full OpenClaw, ~10s)
- *   warming -> try Tenant Router with timeout, fallback to fast-path
- *   cold    -> fast-path Bedrock (~2-3s) + async prewarm
+ * テナント状態に基づいてリクエストをルーティングする:
+ *   warm    -> テナントルーターへ転送 (完全な OpenClaw、約 10 秒)
+ *   warming -> タイムアウト付きでテナントルーターを試み、高速パスにフォールバック
+ *   cold    -> 高速パス Bedrock (約 2-3 秒) + 非同期事前ウォームアップ
  */
 async function routeRequest(channel, userId, userText) {
   const tenantKey = getTenantKey(channel, userId);
@@ -275,14 +275,14 @@ async function routeRequest(channel, userId, userText) {
 
   log(`Route: ${tenantKey} status=${status} fast_path=${FAST_PATH_ENABLED}`);
 
-  // --- Warm: microVM is running, use full OpenClaw pipeline ---
+  // --- ウォーム: microVM が稼動中、完全な OpenClaw パイプラインを使用 ---
   if (status === 'warm') {
     touchTenant(tenantKey);
     const text = await forwardToTenantRouter(channel, userId, userText);
     return text;
   }
 
-  // --- Fast-path disabled: always go through Tenant Router ---
+  // --- 高速パス無効: 常にテナントルーター経由 ---
   if (!FAST_PATH_ENABLED) {
     if (status === 'cold') setTenantStatus(tenantKey, 'warming');
     const text = await forwardToTenantRouter(channel, userId, userText);
@@ -290,38 +290,38 @@ async function routeRequest(channel, userId, userText) {
     return text;
   }
 
-  // --- Warming: microVM might be ready, try with timeout ---
+  // --- ウォーミング中: microVM が準備できている可能性、タイムアウト付きで試みる ---
   if (status === 'warming') {
     const text = await tryTenantRouterWithTimeout(channel, userId, userText, WARMING_TIMEOUT_MS);
     if (text) {
       setTenantStatus(tenantKey, 'warm');
       return text;
     }
-    // Timeout: fall through to fast-path
+    // タイムアウト: 高速パスにフォールスルー
     log(`Warming timeout for ${tenantKey}, using fast-path`);
     const fastText = await fastPathBedrock(userText);
     if (fastText) return fastText;
-    // Fast-path also failed: wait for full pipeline
+    // 高速パスも失敗: 完全なパイプラインを待つ
     const fullText = await forwardToTenantRouter(channel, userId, userText);
     setTenantStatus(tenantKey, 'warm');
     return fullText;
   }
 
-  // --- Cold: first request for this tenant ---
+  // --- コールド: このテナントへの最初のリクエスト ---
   setTenantStatus(tenantKey, 'warming');
 
-  // Async: trigger microVM prewarm with lightweight warmup message (fire-and-forget)
-  // Uses a system message instead of user's actual message to avoid ghost conversation history
+  // 非同期: 軽量ウォームアップメッセージで microVM 事前ウォームアップをトリガー (ファイア・アンド・フォーゲット)
+  // ゴースト会話履歴を避けるため、ユーザーの実際のメッセージではなくシステムメッセージを使用
   prewarmTenantRouter(channel, userId);
 
-  // Sync: fast-path direct Bedrock call (~2-3s)
+  // 同期: 高速パスによる Bedrock への直接呼び出し (約 2-3 秒)
   const fastText = await fastPathBedrock(userText);
   if (fastText) {
     log(`Fast-path response for ${tenantKey}: ${fastText.slice(0, 60)}`);
     return fastText;
   }
 
-  // Fast-path failed (SDK not available or Bedrock error): wait for full pipeline
+  // 高速パス失敗 (SDK 未利用可能または Bedrock エラー): 完全なパイプラインを待つ
   log(`Fast-path unavailable for ${tenantKey}, waiting for Tenant Router`);
   const fullText = await forwardToTenantRouter(channel, userId, userText);
   setTenantStatus(tenantKey, 'warm');
@@ -329,7 +329,7 @@ async function routeRequest(channel, userId, userText) {
 }
 
 // =============================================================================
-// Response Builders (Bedrock Converse API format)
+// レスポンスビルダー (Bedrock Converse API フォーマット)
 // =============================================================================
 
 function buildConverseResponse(text) {
@@ -347,8 +347,8 @@ function buildConverseResponse(text) {
 }
 
 /**
- * Build AWS eventstream binary frames for ConverseStream response.
- * Wire format per event: [total_len:4][headers_len:4][prelude_crc:4][headers][payload][message_crc:4]
+ * ConverseStream レスポンス用の AWS イベントストリームバイナリフレームを構築する。
+ * イベントごとのワイヤーフォーマット: [total_len:4][headers_len:4][prelude_crc:4][headers][payload][message_crc:4]
  */
 function buildEventStream(text) {
   const events = [];
@@ -373,7 +373,7 @@ function buildEventStream(text) {
       let o = 0;
       b.writeUInt8(kb.length, o); o += 1;
       kb.copy(b, o); o += kb.length;
-      b.writeUInt8(7, o); o += 1; // type 7 = string
+      b.writeUInt8(7, o); o += 1; // タイプ 7 = 文字列
       b.writeUInt16BE(vb.length, o); o += 2;
       vb.copy(b, o);
       parts.push(b);
@@ -416,7 +416,7 @@ function buildEventStream(text) {
 }
 
 // =============================================================================
-// HTTP/2 Server (main — handles AWS SDK Bedrock calls from OpenClaw Gateway)
+// HTTP/2 サーバー (メイン — OpenClaw Gateway からの AWS SDK Bedrock 呼び出しを処理)
 // =============================================================================
 
 const server = http2.createServer();
@@ -466,7 +466,7 @@ server.on('stream', (stream, headers) => {
         return;
       }
 
-      // Core routing: fast-path for cold tenants, full pipeline for warm
+      // コアルーティング: コールドテナントには高速パス、ウォームには完全パイプライン
       const responseText = await routeRequest(channel, userId, userText);
       log(`Response: ${responseText.slice(0, 80)}`);
 
@@ -487,7 +487,7 @@ server.on('stream', (stream, headers) => {
 });
 
 // =============================================================================
-// HTTP/1.1 Server (health checks + curl testing)
+// HTTP/1.1 サーバー (ヘルスチェック + curl テスト用)
 // =============================================================================
 
 const h1Server = http.createServer((req, res) => {
@@ -522,7 +522,7 @@ const h1Server = http.createServer((req, res) => {
 });
 
 // =============================================================================
-// Startup
+// 起動
 // =============================================================================
 
 server.listen(PORT, '0.0.0.0', () => {
@@ -536,7 +536,7 @@ h1Server.listen(PORT + 1, '0.0.0.0', () => {
   log(`HTTP/1.1 health check on port ${PORT + 1}`);
 });
 
-// Pre-initialize Bedrock client at startup (non-blocking)
+// 起動時に Bedrock クライアントを事前初期化 (ノンブロッキング)
 if (FAST_PATH_ENABLED) {
   initBedrockClient().catch(() => {});
 }

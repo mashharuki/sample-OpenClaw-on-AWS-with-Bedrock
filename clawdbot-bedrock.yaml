@@ -92,8 +92,8 @@ Conditions:
   AllowSSH: !And
     - !Not [!Equals [!Ref AllowedSSHCIDR, ""]]
     - !Not [!Equals [!Ref KeyPairName, "none"]]
-  # Bedrock Mantle supported regions: https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-mantle.html#bedrock-mantle-supported
-  # !Or supports max 10 conditions; split into two nested groups
+  # Bedrock Mantle 対応リージョン: https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-mantle.html#bedrock-mantle-supported
+  # !Or は最大10条件のみサポート。2つのネストされたグループに分割
   IsUsEast1: !Equals [ !Ref "AWS::Region", "us-east-1" ]
   IsUsEast2: !Equals [ !Ref "AWS::Region", "us-east-2" ]
   IsUsWest2: !Equals [ !Ref "AWS::Region", "us-west-2" ]
@@ -127,7 +127,7 @@ Conditions:
   DeleteData: !Not [!Equals [!Ref EnableDataProtection, "true"]]
 
 Mappings:
-  # Architecture detection based on instance type
+  # インスタンスタイプに基づくアーキテクチャ検出
   ArchitectureMap:
     t3.small: { Arch: "amd64" }
     t3.medium: { Arch: "amd64" }
@@ -145,7 +145,7 @@ Mappings:
 
 
 Resources:
-  # ==================== Wait Condition ====================
+  # ==================== 待機条件 ====================
   OpenClawWaitHandle:
     Type: AWS::CloudFormation::WaitConditionHandle
 
@@ -157,7 +157,7 @@ Resources:
       Timeout: '900'
       Count: 1
 
-  # ==================== VPC and Network ====================
+  # ==================== VPC とネットワーク ====================
   OpenClawVPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -217,7 +217,7 @@ Resources:
       SubnetId: !Ref PublicSubnet
       RouteTableId: !Ref PublicRouteTable
 
-  # VPC Endpoint Security Group
+  # VPC エンドポイントセキュリティグループ
   VPCEndpointSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Condition: CreateEndpoints
@@ -233,7 +233,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-vpce-sg"
 
-  # Bedrock Runtime VPC Endpoint (Converse API)
+  # Bedrock Runtime VPC エンドポイント (Converse API)
   BedrockRuntimeVPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Condition: CreateEndpoints
@@ -247,7 +247,7 @@ Resources:
       SecurityGroupIds:
         - !Ref VPCEndpointSecurityGroup
 
-  # Bedrock Mantle VPC Endpoint (OpenAI-compatible API for Project Mantle models like Kimi K2.5)
+  # Bedrock Mantle VPC エンドポイント (Kimi K2.5 等の Project Mantle モデル向け OpenAI 互換 API)
   BedrockMantleVPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Condition: CreateMantleEndpoint
@@ -261,7 +261,7 @@ Resources:
       SecurityGroupIds:
         - !Ref VPCEndpointSecurityGroup
 
-  # SSM VPC Endpoint (for Session Manager)
+  # SSM VPC エンドポイント (Session Manager 用)
   SSMVPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Condition: CreateEndpoints
@@ -301,7 +301,7 @@ Resources:
       SecurityGroupIds:
         - !Ref VPCEndpointSecurityGroup
 
-  # ==================== IAM Role ====================
+  # ==================== IAM ロール ====================
   OpenClawInstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -346,7 +346,7 @@ Resources:
       Roles:
         - !Ref OpenClawInstanceRole
 
-  # ==================== Security Group ====================
+  # ==================== セキュリティグループ ====================
   OpenClawSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -368,7 +368,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-sg"
 
-  # ==================== Data Volume ====================
+  # ==================== データボリューム ====================
   OpenClawDataVolumeRetained:
     Type: AWS::EC2::Volume
     Condition: ProtectData
@@ -397,7 +397,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-data"
 
-  # ==================== EC2 Instance ====================
+  # ==================== EC2 インスタンス ====================
   OpenClawInstance:
     Type: AWS::EC2::Instance
     Properties:
@@ -425,7 +425,7 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
-          # Remove set -e to prevent script from stopping on errors
+          # エラー発生時にスクリプトが停止しないよう set -e を除外
           
           exec > >(tee /var/log/openclaw-setup.log)
           exec 2>&1
@@ -436,9 +436,9 @@ Resources:
           
           export DEBIAN_FRONTEND=noninteractive
           
-          # Mount data volume
+          # データボリュームのマウント
           echo "[0/9] Mounting data volume..."
-          # Find the data volume - look for unformatted or openclaw-data labeled device
+          # データボリュームを検索 - 未フォーマットまたは openclaw-data ラベル付きデバイスを探す
           DATA_DEVICE=""
           for dev in /dev/nvme1n1 /dev/xvdf /dev/sdf; do
             if [ -b "$dev" ]; then
@@ -446,7 +446,7 @@ Resources:
               break
             fi
           done
-          # Fallback: find by lsblk (second disk, not root)
+          # フォールバック: lsblk で検索（2番目のディスク、ルートを除く）
           if [ -z "$DATA_DEVICE" ]; then
             DATA_DEVICE=$(lsblk -dpno NAME,TYPE | awk '$2=="disk"{print $1}' | grep -v "$(findmnt -n -o SOURCE / | sed 's/p[0-9]*$//')" | head -1)
           fi
@@ -465,13 +465,13 @@ Resources:
             [ -L /home/ubuntu/.openclaw ] || ln -sf /data/openclaw /home/ubuntu/.openclaw
           fi
           
-          # System update
+          # システムの更新
           echo "[1/9] Updating system..."
           apt-get update
           apt-get upgrade -y
           apt-get install -y unzip curl
 
-          # Detect region and instance ID once (IMDSv2)
+          # リージョンとインスタンスIDを一度だけ検出 (IMDSv2)
           echo "[*] Detecting instance metadata..."
           IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null || echo "")
           if [ -n "$IMDS_TOKEN" ]; then
@@ -485,20 +485,20 @@ Resources:
           INSTANCE_ID=${!INSTANCE_ID:-"unknown"}
           echo "Region: $AWS_REGION | Instance: $INSTANCE_ID"
 
-          # Install AWS CLI v2
+          # AWS CLI v2 のインストール
           echo "[2/9] Installing AWS CLI..."
           curl "https://awscli.amazonaws.com/awscli-exe-linux-$(arch).zip" -o "awscliv2.zip"
           unzip -q awscliv2.zip
           ./aws/install
           rm -rf aws awscliv2.zip
           
-          # Install SSM Agent (usually pre-installed)
+          # SSM エージェントのインストール (通常はプリインストール済み)
           echo "[3/9] Configuring SSM Agent..."
           snap start amazon-ssm-agent || systemctl start amazon-ssm-agent
           
-          # Install Docker (if EnableSandbox=true)
+          # Docker のインストール (EnableSandbox=true の場合)
           if [ "${EnableSandbox}" = "true" ]; then
-            # Install Docker via GPG-signed apt repo
+            # GPG 署名済み apt リポジトリで Docker をインストール
             echo "[4/9] Installing Docker..."
             install -m 0755 -d /etc/apt/keyrings
             curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
@@ -513,12 +513,12 @@ Resources:
             echo "[4/9] Skipping Docker (EnableSandbox=false)..."
           fi
           
-          # Install Node.js
+          # Node.js のインストール
           echo "[5/9] Installing Node.js..."
           sudo -u ubuntu bash << 'UBUNTU_SCRIPT'
           cd ~
           
-          # Install NVM (download first, then execute)
+          # NVM のインストール (先にダウンロードしてから実行)
           NVM_VERSION="v0.40.1"
           for i in 1 2 3; do
             curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/${!NVM_VERSION}/install.sh" -o /tmp/nvm-install.sh && break
@@ -531,13 +531,13 @@ Resources:
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
           
-          # Install Node.js 22
+          # Node.js 22 のインストール
           nvm install 22
           nvm use 22
           nvm alias default 22
           
-          # Install OpenClaw (with timeout and retry)
-          # arm64 has no prebuilt @discordjs/opus binary, use --ignore-scripts on arm64
+          # OpenClaw のインストール (タイムアウトとリトライ付き)
+          # arm64 には @discordjs/opus のビルド済みバイナリがないため arm64 では --ignore-scripts を使用
           npm config set registry https://registry.npmjs.org/
           ARCH=$(uname -m)
           if [ "$ARCH" = "aarch64" ]; then
@@ -561,7 +561,7 @@ Resources:
           fi
           UBUNTU_SCRIPT
           
-          # Create a wrapper script so openclaw works system-wide without sourcing .bashrc
+          # .bashrc を source せずに openclaw をシステム全体で使えるようラッパースクリプトを作成
           OPENCLAW_MJS=$(find /home/ubuntu/.nvm -path "*/node_modules/openclaw/openclaw.mjs" 2>/dev/null | head -1)
           NODE_BIN=$(find /home/ubuntu/.nvm -name node -type f 2>/dev/null | head -1)
           if [ -z "$OPENCLAW_MJS" ] || [ -z "$NODE_BIN" ]; then
@@ -573,21 +573,21 @@ Resources:
           chmod +x /usr/local/bin/openclaw
           echo "openclaw wrapper created: node=$NODE_BIN mjs=$OPENCLAW_MJS"
           
-          # Verify openclaw actually works before proceeding
+          # 続行前に openclaw が実際に動作することを確認
           if ! /usr/local/bin/openclaw --version 2>/dev/null; then
             echo "FATAL: openclaw wrapper cannot execute - check node path"
             exit 1
           fi
           echo "openclaw verified OK: $(/usr/local/bin/openclaw --version)"
           
-          # Configure AWS region
+          # AWS リージョンの設定
           echo "[6/9] Configuring AWS..."
           sudo -u ubuntu mkdir -p /home/ubuntu/.aws
           sudo -u ubuntu bash -c "printf '[default]\nregion = %s\noutput = json\n' \"$AWS_REGION\" > /home/ubuntu/.aws/config"
           chown -R ubuntu:ubuntu /home/ubuntu/.aws
           chmod 600 /home/ubuntu/.aws/config
           
-          # Configure environment variables
+          # 環境変数の設定
           echo "[7/9] Configuring environment variables..."
           {
             echo "export AWS_REGION=$AWS_REGION"
@@ -597,24 +597,24 @@ Resources:
             echo "export OPENCLAW_USE_BEDROCK=true"
           } >> /home/ubuntu/.bashrc
           
-          # Create systemd environment file for services
+          # サービス用 systemd 環境ファイルの作成
           sudo -u ubuntu mkdir -p /home/ubuntu/.config/environment.d
           sudo -u ubuntu bash -c "{ echo AWS_REGION=$AWS_REGION; echo AWS_DEFAULT_REGION=$AWS_REGION; } > /home/ubuntu/.config/environment.d/aws.conf"
           
-          # 启用 systemd linger
+          # systemd linger を有効化
           loginctl enable-linger ubuntu
           systemctl start user@1000.service
           
-          # 运行 OpenClaw onboarding
+          # OpenClaw オンボーディングの実行
           echo "[8/9] Configuring OpenClaw..."
           
-          # Create config directory
+          # 設定ディレクトリの作成
           sudo -u ubuntu mkdir -p /home/ubuntu/.openclaw
           
-          # Generate Gateway Token
+          # ゲートウェイトークンの生成
           GATEWAY_TOKEN=$(openssl rand -hex 24)
           
-          # Create Bedrock configuration file (write as ubuntu to ensure correct ownership)
+          # Bedrock 設定ファイルの作成 (正しい所有権のため ubuntu として書き込む)
           sudo -u ubuntu tee /home/ubuntu/.openclaw/openclaw.json > /dev/null << 'JSONEOF'
           {
             "gateway": {
@@ -658,13 +658,13 @@ Resources:
           }
           JSONEOF
           
-          # Replace placeholders
+          # プレースホルダーの置換
           sed -i "s/GATEWAY_TOKEN_PLACEHOLDER/$GATEWAY_TOKEN/g" /home/ubuntu/.openclaw/openclaw.json
           sed -i "s/REGION_PLACEHOLDER/$AWS_REGION/g" /home/ubuntu/.openclaw/openclaw.json
           sed -i "s|MODEL_ID_PLACEHOLDER|${OpenClawModel}|g" /home/ubuntu/.openclaw/openclaw.json
           
-          # Install and start gateway
-          # Wait for user@1000 systemd session to be ready
+          # ゲートウェイのインストールと起動
+          # user@1000 systemd セッションの準備完了を待機
           for i in $(seq 1 15); do
             if [ -S /run/user/1000/bus ]; then
               echo "User systemd session ready"
@@ -682,7 +682,7 @@ Resources:
           systemctl --user start openclaw-gateway.service || { openclaw gateway & } || echo "Gateway start failed"
           '
           
-          # Wait for daemon to be ready and verify port 18789 is listening
+          # デーモンの準備完了を待機し、ポート 18789 のリッスン状態を確認
           echo "Waiting for OpenClaw daemon to start..."
           for i in $(seq 1 30); do
             if ss -tlnp 2>/dev/null | grep -q ':18789'; then
@@ -704,24 +704,24 @@ Resources:
             sleep 5
           fi
           
-          # Enable messaging channels
+          # メッセージングチャンネルの有効化
           echo "[8.5/9] Enabling messaging channels..."
           sudo -H -u ubuntu bash -c '
           export HOME=/home/ubuntu
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
           
-          # Core channels (built-in)
+          # コアチャンネル (ビルトイン)
           openclaw plugins enable whatsapp || echo "WhatsApp plugin enable failed"
           openclaw plugins enable telegram || echo "Telegram plugin enable failed"
           openclaw plugins enable discord || echo "Discord plugin enable failed"
           openclaw plugins enable slack || echo "Slack plugin enable failed"
           
-          # Feishu/Lark (community plugin)
+          # Feishu/Lark (コミュニティプラグイン)
           npm install -g openclaw-feishu@latest --timeout=60000 2>/dev/null || echo "Feishu plugin install skipped"
           '
           
-          # Create SOUL.md — first-message onboarding prompt
+          # SOUL.md の作成 — 初回メッセージのオンボーディングプロンプト
           sudo -u ubuntu cat > /home/ubuntu/.openclaw/SOUL.md << 'SOUL_EOF'
           # OpenClaw on AWS
 
@@ -766,7 +766,7 @@ Resources:
           SOUL_EOF
           chown ubuntu:ubuntu /home/ubuntu/.openclaw/SOUL.md
           
-          # Save token to SSM Parameter Store (encrypted, never written to disk)
+          # トークンを SSM パラメータストアに保存 (暗号化済み、ディスクには書き込まない)
           STACK_NAME="${AWS::StackName}"
           aws ssm put-parameter \
             --name "/openclaw/$STACK_NAME/gateway-token" \
@@ -776,11 +776,11 @@ Resources:
             --overwrite || echo "Failed to save token to SSM"
           unset GATEWAY_TOKEN
 
-          # Save instance info (non-secret metadata only)
+          # インスタンス情報の保存 (非機密メタデータのみ)
           echo "$INSTANCE_ID" > /home/ubuntu/.openclaw/instance_id.txt
           echo "$AWS_REGION" > /home/ubuntu/.openclaw/region.txt
 
-          # Create SSM access script (retrieves token from SSM at runtime — never stored on disk)
+          # SSM アクセススクリプトの作成 (実行時に SSM からトークンを取得 — ディスクには保存しない)
           cat > /home/ubuntu/ssm-portforward.sh << 'SSMEOF'
           #!/bin/bash
           IMDS_TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
@@ -809,7 +809,7 @@ Resources:
           chmod +x /home/ubuntu/ssm-portforward.sh
           chown ubuntu:ubuntu /home/ubuntu/ssm-portforward.sh
 
-          # Complete
+          # 完了
           echo "[9/9] Signaling CloudFormation..."
           echo "SUCCESS" > /home/ubuntu/.openclaw/setup_status.txt
           echo "Setup completed: $(date)" >> /home/ubuntu/.openclaw/setup_status.txt
@@ -817,10 +817,10 @@ Resources:
           apt-get install -y python3-pip 2>&1 | tee -a /var/log/openclaw-setup.log
           pip3 install --break-system-packages https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz 2>&1 | tee -a /var/log/openclaw-setup.log || echo "cfn-bootstrap install failed, will use curl fallback"
 
-          # Find cfn-signal location
+          # cfn-signal の場所を検索
           CFN_SIGNAL=$(which cfn-signal 2>/dev/null || find /usr -name cfn-signal 2>/dev/null | head -1)
 
-          # Signal CloudFormation (token NOT included — retrieve from SSM)
+          # CloudFormation へシグナル送信 (トークンは含まない — SSM から取得する)
           COMPLETE_MSG="OpenClaw ready. Run: aws ssm get-parameter --name /openclaw/$STACK_NAME/gateway-token --with-decryption --query Parameter.Value --output text --region $AWS_REGION"
 
           if [ -n "$CFN_SIGNAL" ]; then

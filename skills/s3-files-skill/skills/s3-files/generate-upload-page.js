@@ -325,7 +325,7 @@ async function generateUploadPage(maxSizeMB) {
   console.log(`📏 Max file size: ${maxSize} MB`);
   console.log(`⏰ Expiration: 1 hour\n`);
 
-  // Generate pre-signed POST credentials
+  // 事前署名 POST 認証情報を生成
   const { url, fields } = await createPresignedPost(s3Client, {
     Bucket: config.bucketName,
     Key: key,
@@ -335,13 +335,13 @@ async function generateUploadPage(maxSizeMB) {
     Expires: 3600,
   });
 
-  // Create HTML page with credentials embedded
+  // 認証情報を埋め込んだ HTML ページを作成
   let html = HTML_TEMPLATE;
   html = html.replace('__UPLOAD_URL__', JSON.stringify(url));
   html = html.replace('__UPLOAD_FIELDS__', JSON.stringify(fields));
   html = html.replace('__MAX_SIZE__', maxSize);
 
-  // Upload the page to S3
+  // ページを S3 にアップロード
   const pageName = `upload-page-${Date.now()}.html`;
   const pageCommand = new PutObjectCommand({
     Bucket: config.bucketName,
@@ -352,14 +352,14 @@ async function generateUploadPage(maxSizeMB) {
 
   await s3Client.send(pageCommand);
 
-  // Generate download URL for the page
+  // ページのダウンロード URL を生成
   const pageDownloadCommand = new GetObjectCommand({
     Bucket: config.bucketName,
     Key: pageName,
   });
 
   const pageUrl = await getSignedUrl(s3Client, pageDownloadCommand, { 
-    expiresIn: 86400 // 24 hours
+    expiresIn: 86400 // 24 時間
   });
 
   console.log(`✅ Upload page created!\n`);
@@ -370,7 +370,7 @@ async function generateUploadPage(maxSizeMB) {
   return { pageUrl, uploadKey: key };
 }
 
-// CLI usage
+// CLI 使用方法
 if (require.main === module) {
   const maxSizeMB = parseInt(process.argv[2]) || config.maxUploadSizeMB;
 

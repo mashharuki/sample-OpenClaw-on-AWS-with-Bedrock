@@ -1,15 +1,15 @@
 #!/bin/bash
 # =============================================================================
-# Deploy OpenClaw Multi-Tenant Platform — Full Pipeline
+# OpenClaw マルチテナントプラットフォームのデプロイ — フルパイプライン
 #
-# This script deploys the complete multi-tenant platform:
-#   1. CloudFormation stack (EC2 + ECR + S3 + SSM + CloudWatch)
-#   2. Build and push Agent Container to ECR
-#   3. Upload SOUL.md templates to S3
-#   4. Create AgentCore Runtime
-#   5. Store Runtime ID in SSM
+# このスクリプトは完全なマルチテナントプラットフォームをデプロイする:
+#   1. CloudFormation スタック (EC2 + ECR + S3 + SSM + CloudWatch)
+#   2. エージェントコンテナをビルドして ECR にプッシュ
+#   3. SOUL.md テンプレートを S3 にアップロード
+#   4. AgentCore Runtime を作成
+#   5. Runtime ID を SSM に保存
 #
-# Usage: bash deploy-multitenancy.sh [STACK_NAME] [REGION]
+# 使用方法: bash deploy-multitenancy.sh [STACK_NAME] [REGION]
 # =============================================================================
 set -euo pipefail
 
@@ -18,30 +18,30 @@ REGION="${2:-us-east-1}"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
 echo "============================================"
-echo "  OpenClaw Multi-Tenant Platform Deployment"
+echo "  OpenClaw マルチテナントプラットフォーム デプロイ"
 echo "============================================"
-echo "  Stack:   $STACK_NAME"
-echo "  Region:  $REGION"
-echo "  Account: $ACCOUNT_ID"
+echo "  スタック:   $STACK_NAME"
+echo "  リージョン: $REGION"
+echo "  アカウント: $ACCOUNT_ID"
 echo ""
 
 # =============================================================================
-# Step 0: Upgrade AWS CLI (bedrock-agentcore-control requires CLI >= 2.27)
+# ステップ 0: AWS CLI のアップグレード (bedrock-agentcore-control は CLI >= 2.27 が必要)
 # =============================================================================
-echo "[0/5] Checking AWS CLI version..."
+echo "[0/5] AWS CLI バージョンを確認中..."
 CLI_VERSION=$(aws --version 2>&1 | grep -oP 'aws-cli/\K[0-9]+\.[0-9]+' || echo "0.0")
 CLI_MAJOR=$(echo "$CLI_VERSION" | cut -d. -f1)
 CLI_MINOR=$(echo "$CLI_VERSION" | cut -d. -f2)
 if [ "$CLI_MAJOR" -lt 2 ] || ([ "$CLI_MAJOR" -eq 2 ] && [ "$CLI_MINOR" -lt 27 ]); then
-    echo "  WARNING: AWS CLI $CLI_VERSION detected. bedrock-agentcore-control requires >= 2.27"
-    echo "  Run: pip install --upgrade awscli  OR  brew upgrade awscli"
-    echo "  Continuing anyway — commands may fail if CLI is too old."
+    echo "  警告: AWS CLI $CLI_VERSION が検出されました。bedrock-agentcore-control には >= 2.27 が必要です"
+    echo "  実行: pip install --upgrade awscli  または  brew upgrade awscli"
+    echo "  このまま続行します — CLI が古すぎる場合はコマンドが失敗する可能性があります。"
 fi
 
 # =============================================================================
-# Step 1: Deploy CloudFormation
+# ステップ 1: CloudFormation をデプロイ
 # =============================================================================
-echo "[1/5] Deploying CloudFormation stack..."
+echo "[1/5] CloudFormation スタックをデプロイ中..."
 
 aws cloudformation create-stack \
     --stack-name "$STACK_NAME" \
@@ -51,14 +51,14 @@ aws cloudformation create-stack \
     --parameters \
         ParameterKey=KeyPairName,ParameterValue=none \
         ParameterKey=OpenClawModel,ParameterValue=global.amazon.nova-2-lite-v1:0 \
-    2>/dev/null || echo "  Stack may already exist, checking..."
+    2>/dev/null || echo "  スタックは既に存在する可能性があります。確認中..."
 
-echo "  Waiting for stack to complete (this takes ~8 minutes)..."
+echo "  スタックの完了を待機中 (約 8 分かかります)..."
 aws cloudformation wait stack-create-complete \
     --stack-name "$STACK_NAME" --region "$REGION" 2>/dev/null \
-    || echo "  Stack already exists or update needed"
+    || echo "  スタックは既に存在するか更新が必要です"
 
-# Get outputs
+# 出力を取得
 ECR_URI=$(aws cloudformation describe-stacks \
     --stack-name "$STACK_NAME" --region "$REGION" \
     --query 'Stacks[0].Outputs[?OutputKey==`MultitenancyEcrRepositoryUri`].OutputValue' \
@@ -79,43 +79,43 @@ INSTANCE_ID=$(aws cloudformation describe-stacks \
     --query 'Stacks[0].Outputs[?OutputKey==`InstanceId`].OutputValue' \
     --output text)
 
-echo "  ECR:      $ECR_URI"
-echo "  Role:     $EXECUTION_ROLE_ARN"
-echo "  S3:       $S3_BUCKET"
-echo "  Instance: $INSTANCE_ID"
+echo "  ECR:        $ECR_URI"
+echo "  ロール:     $EXECUTION_ROLE_ARN"
+echo "  S3:         $S3_BUCKET"
+echo "  インスタンス: $INSTANCE_ID"
 
 # =============================================================================
-# Step 2: Upload SOUL.md templates to S3
+# ステップ 2: SOUL.md テンプレートを S3 にアップロード
 # =============================================================================
 echo ""
-echo "[2/5] Uploading SOUL.md templates to S3..."
+echo "[2/5] SOUL.md テンプレートを S3 にアップロード中..."
 
 aws s3 cp agent-container/templates/default.md "s3://${S3_BUCKET}/_shared/templates/default.md" --region "$REGION"
 aws s3 cp agent-container/templates/intern.md "s3://${S3_BUCKET}/_shared/templates/intern.md" --region "$REGION"
 aws s3 cp agent-container/templates/engineer.md "s3://${S3_BUCKET}/_shared/templates/engineer.md" --region "$REGION"
-echo "  Uploaded 3 templates"
+echo "  3 つのテンプレートをアップロードしました"
 
 # =============================================================================
-# Step 3: Build and push Agent Container
+# ステップ 3: エージェントコンテナをビルドして ECR にプッシュ
 # =============================================================================
 echo ""
-echo "[3/5] Building and pushing Agent Container to ECR..."
+echo "[3/5] エージェントコンテナをビルドして ECR にプッシュ中..."
 
 aws ecr get-login-password --region "$REGION" | \
     docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
 
-echo "  Building Docker image (platform=linux/arm64)..."
+echo "  Docker イメージをビルド中 (platform=linux/arm64)..."
 docker build --platform linux/arm64 -f agent-container/Dockerfile -t "${ECR_URI}:latest" .
 
-echo "  Pushing to ECR..."
+echo "  ECR にプッシュ中..."
 docker push "${ECR_URI}:latest"
-echo "  Image pushed: ${ECR_URI}:latest"
+echo "  イメージをプッシュしました: ${ECR_URI}:latest"
 
 # =============================================================================
-# Step 4: Create AgentCore Runtime
+# ステップ 4: AgentCore Runtime を作成
 # =============================================================================
 echo ""
-echo "[4/5] Creating AgentCore Runtime..."
+echo "[4/5] AgentCore Runtime を作成中..."
 
 RUNTIME_ID=$(aws bedrock-agentcore-control create-agent-runtime \
     --agent-runtime-name "${STACK_NAME//-/_}_runtime" \
@@ -127,21 +127,21 @@ RUNTIME_ID=$(aws bedrock-agentcore-control create-agent-runtime \
     --environment-variables STACK_NAME="${STACK_NAME}",AWS_REGION="${REGION}",S3_BUCKET="${S3_BUCKET}",BEDROCK_MODEL_ID="global.amazon.nova-2-lite-v1:0" \
     --region "$REGION" \
     --query 'agentRuntimeId' --output text 2>&1) || {
-    echo "  create-agent-runtime failed: $RUNTIME_ID"
-    echo "  Trying to get existing runtime from SSM..."
+    echo "  create-agent-runtime 失敗: $RUNTIME_ID"
+    echo "  SSM から既存のランタイム ID を取得しようとしています..."
     RUNTIME_ID=$(aws ssm get-parameter \
         --name "/openclaw/${STACK_NAME}/runtime-id" \
         --query Parameter.Value --output text \
         --region "$REGION" 2>/dev/null || echo "UNKNOWN")
 }
 
-echo "  Runtime ID: $RUNTIME_ID"
+echo "  ランタイム ID: $RUNTIME_ID"
 
 # =============================================================================
-# Step 5: Create AgentCore Runtime Endpoint
+# ステップ 5: AgentCore Runtime エンドポイントを作成
 # =============================================================================
 echo ""
-echo "[5/6] Creating AgentCore Runtime Endpoint..."
+echo "[5/6] AgentCore Runtime エンドポイントを作成中..."
 
 ENDPOINT_NAME="${STACK_NAME//-/_}_endpoint"
 aws bedrock-agentcore-control create-agent-runtime-endpoint \
@@ -149,15 +149,15 @@ aws bedrock-agentcore-control create-agent-runtime-endpoint \
     --name "$ENDPOINT_NAME" \
     --region "$REGION" \
     --query 'agentRuntimeEndpointArn' --output text 2>&1 || {
-    echo "  Endpoint may already exist or runtime not ready yet."
-    echo "  You can create it later once runtime status is READY."
+    echo "  エンドポイントは既に存在するか、ランタイムがまだ準備できていません。"
+    echo "  ランタイムのステータスが READY になってから後で作成できます。"
 }
 
 # =============================================================================
-# Step 6: Store Runtime ID in SSM
+# ステップ 6: Runtime ID を SSM に保存
 # =============================================================================
 echo ""
-echo "[6/6] Storing Runtime ID in SSM..."
+echo "[6/6] SSM に Runtime ID を保存中..."
 
 aws ssm put-parameter \
     --name "/openclaw/${STACK_NAME}/runtime-id" \
@@ -166,26 +166,26 @@ aws ssm put-parameter \
     --overwrite \
     --region "$REGION"
 
-echo "  Stored at /openclaw/${STACK_NAME}/runtime-id"
+echo "  /openclaw/${STACK_NAME}/runtime-id に保存しました"
 
 # =============================================================================
-# Done
+# 完了
 # =============================================================================
 echo ""
 echo "============================================"
-echo "  Deployment Complete!"
+echo "  デプロイ完了!"
 echo "============================================"
 echo ""
-echo "  Stack:      $STACK_NAME"
-echo "  Runtime ID: $RUNTIME_ID"
-echo "  S3 Bucket:  $S3_BUCKET"
-echo "  Instance:   $INSTANCE_ID"
+echo "  スタック:      $STACK_NAME"
+echo "  ランタイム ID: $RUNTIME_ID"
+echo "  S3 バケット:   $S3_BUCKET"
+echo "  インスタンス:  $INSTANCE_ID"
 echo ""
-echo "  Next steps:"
-echo "  1. Connect to EC2: aws ssm start-session --target $INSTANCE_ID --region $REGION"
-echo "  2. Configure Telegram bot in OpenClaw Web UI"
-echo "  3. Start Tenant Router:"
+echo "  次のステップ:"
+echo "  1. EC2 に接続: aws ssm start-session --target $INSTANCE_ID --region $REGION"
+echo "  2. OpenClaw Web UI で Telegram ボットを設定"
+echo "  3. テナントルーターを起動:"
 echo "     export STACK_NAME=$STACK_NAME AWS_REGION=$REGION AGENTCORE_RUNTIME_ID=$RUNTIME_ID"
 echo "     python3 src/gateway/tenant_router.py"
-echo "  4. Send a message on Telegram to test!"
+echo "  4. Telegram でメッセージを送信してテスト!"
 echo ""

@@ -84,8 +84,8 @@ Conditions:
   AllowSSH: !And
     - !Not [!Equals [!Ref AllowedSSHCIDR, ""]]
     - !Not [!Equals [!Ref KeyPairName, "none"]]
-  # Bedrock Mantle supported regions: https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-mantle.html#bedrock-mantle-supported
-  # !Or supports max 10 conditions; split into two nested groups
+  # Bedrock Mantle 対応リージョン: https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-mantle.html#bedrock-mantle-supported
+  # !Or は最大10条件のみサポート。2つのネストされたグループに分割
   IsUsEast1: !Equals [ !Ref "AWS::Region", "us-east-1" ]
   IsUsEast2: !Equals [ !Ref "AWS::Region", "us-east-2" ]
   IsUsWest2: !Equals [ !Ref "AWS::Region", "us-west-2" ]
@@ -145,7 +145,7 @@ Mappings:
       x86: "ami-07020a94c8d2684e2"
 
 Resources:
-  # ==================== Wait Condition ====================
+  # ==================== 待機条件 ====================
   OpenClawWaitHandle:
     Type: AWS::CloudFormation::WaitConditionHandle
 
@@ -157,7 +157,7 @@ Resources:
       Timeout: '1800'
       Count: 1
 
-  # ==================== Mac Dedicated Host ====================
+  # ==================== Mac 専用ホスト ====================
   MacDedicatedHost:
     Type: AWS::EC2::Host
     Properties:
@@ -165,7 +165,7 @@ Resources:
       AvailabilityZone: !Ref MacAvailabilityZone
       InstanceType: !Ref MacInstanceType
 
-  # ==================== VPC and Network ====================
+  # ==================== VPC とネットワーク ====================
   OpenClawVPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -225,7 +225,7 @@ Resources:
       SubnetId: !Ref PublicSubnet
       RouteTableId: !Ref PublicRouteTable
 
-  # VPC Endpoint Security Group
+  # VPC エンドポイントセキュリティグループ
   VPCEndpointSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Condition: CreateEndpoints
@@ -241,7 +241,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-vpce-sg"
 
-  # Bedrock Runtime VPC Endpoint (Converse API)
+  # Bedrock Runtime VPC エンドポイント (Converse API)
   BedrockRuntimeVPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Condition: CreateEndpoints
@@ -255,7 +255,7 @@ Resources:
       SecurityGroupIds:
         - !Ref VPCEndpointSecurityGroup
 
-  # Bedrock Mantle VPC Endpoint (OpenAI-compatible API for Project Mantle models like Kimi K2.5)
+  # Bedrock Mantle VPC エンドポイント (Kimi K2.5 等の Project Mantle モデル向け OpenAI 互換 API)
   BedrockMantleVPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Condition: CreateMantleEndpoint
@@ -269,7 +269,7 @@ Resources:
       SecurityGroupIds:
         - !Ref VPCEndpointSecurityGroup
 
-  # SSM VPC Endpoint (for Session Manager)
+  # SSM VPC エンドポイント (Session Manager 用)
   SSMVPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Condition: CreateEndpoints
@@ -309,7 +309,7 @@ Resources:
       SecurityGroupIds:
         - !Ref VPCEndpointSecurityGroup
 
-  # ==================== IAM Role ====================
+  # ==================== IAM ロール ====================
   OpenClawInstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -354,7 +354,7 @@ Resources:
       Roles:
         - !Ref OpenClawInstanceRole
 
-  # ==================== Security Group ====================
+  # ==================== セキュリティグループ ====================
   OpenClawSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -384,7 +384,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-sg"
 
-  # ==================== EC2 Mac Instance ====================
+  # ==================== EC2 Mac インスタンス ====================
   OpenClawInstance:
     Type: AWS::EC2::Instance
     Properties:
@@ -415,7 +415,7 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
-          # macOS setup script for OpenClaw
+          # OpenClaw 用 macOS セットアップスクリプト
           
           exec > /tmp/openclaw-setup.log 2>&1
           
@@ -424,14 +424,14 @@ Resources:
           echo "Instance Type: ${MacInstanceType}"
           echo "=========================================="
           
-          # Wait for system to be ready
+          # システムの準備完了を待機
           sleep 30
           
-          # Get current user (ec2-user on Mac instances)
+          # 現在のユーザーを取得 (Mac インスタンスでは ec2-user)
           CURRENT_USER="ec2-user"
           USER_HOME="/Users/$CURRENT_USER"
 
-          # Detect region and instance ID once (IMDSv2)
+          # リージョンとインスタンスIDを一度だけ検出 (IMDSv2)
           echo "[*] Detecting instance metadata..."
           IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null || echo "")
           if [ -n "$IMDS_TOKEN" ]; then
@@ -445,36 +445,36 @@ Resources:
           INSTANCE_ID=${!INSTANCE_ID:-"unknown"}
           echo "Region: $AWS_REGION | Instance: $INSTANCE_ID"
 
-          # System update via softwareupdate
+          # softwareupdate によるシステム更新
           echo "[1/9] Checking for system updates..."
           softwareupdate --list 2>/dev/null || true
           
-          # Install Homebrew if not present
+          # Homebrew がない場合はインストール
           echo "[2/9] Installing Homebrew..."
           if ! command -v brew &> /dev/null; then
             sudo -u $CURRENT_USER /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" < /dev/null
             
-            # Add Homebrew to PATH for Apple Silicon
+            # Apple Silicon 向けに Homebrew を PATH に追加
             if [[ $(uname -m) == "arm64" ]]; then
               echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> $USER_HOME/.zprofile
               eval "$(/opt/homebrew/bin/brew shellenv)"
             fi
           fi
           
-          # Source Homebrew for current session
+          # 現在のセッション向けに Homebrew を source
           if [[ $(uname -m) == "arm64" ]]; then
             eval "$(/opt/homebrew/bin/brew shellenv)"
           else
             eval "$(/usr/local/bin/brew shellenv)"
           fi
           
-          # Install AWS CLI
+          # AWS CLI のインストール
           echo "[3/9] Installing AWS CLI..."
           sudo -u $CURRENT_USER brew install awscli || true
           
-          # Install SSM Agent for macOS
+          # macOS 用 SSM エージェントのインストール
           echo "[3.5/9] Installing SSM Agent..."
-          # Download and install SSM Agent for macOS
+          # macOS 用 SSM エージェントをダウンロードしてインストール
           if [[ $(uname -m) == "arm64" ]]; then
             curl -o /tmp/amazon-ssm-agent.pkg "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/darwin_arm64/amazon-ssm-agent.pkg"
           else
@@ -483,16 +483,16 @@ Resources:
           installer -pkg /tmp/amazon-ssm-agent.pkg -target /
           rm -f /tmp/amazon-ssm-agent.pkg
           
-          # Start SSM Agent
+          # SSM エージェントの起動
           launchctl load -w /Library/LaunchDaemons/com.amazon.aws.ssm.plist || true
           launchctl start com.amazon.aws.ssm || true
           
-          # Install Node.js via NVM
+          # NVM 経由で Node.js をインストール
           echo "[4/9] Installing Node.js..."
           sudo -u $CURRENT_USER bash << 'USERSCRIPT'
           cd ~
           
-          # Install NVM (download first, then execute)
+          # NVM のインストール (先にダウンロードしてから実行)
           NVM_VERSION="v0.40.1"
           curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/${!NVM_VERSION}/install.sh" -o /tmp/nvm-install.sh
           bash /tmp/nvm-install.sh
@@ -501,13 +501,13 @@ Resources:
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
           
-          # Install Node.js 22
+          # Node.js 22 のインストール
           nvm install 22
           nvm use 22
           nvm alias default 22
           
-          # Install OpenClaw
-          # arm64 (Apple Silicon) has no prebuilt @discordjs/opus binary, use --ignore-scripts
+          # OpenClaw のインストール
+          # arm64 (Apple Silicon) には @discordjs/opus のビルド済みバイナリがないため --ignore-scripts を使用
           npm config set registry https://registry.npmjs.org/
           ARCH=$(uname -m)
           if [ "$ARCH" = "arm64" ]; then
@@ -525,14 +525,14 @@ Resources:
             }
           fi
           
-          # Add NVM to shell profile
+          # NVM をシェルプロファイルに追加
           if ! grep -q 'NVM_DIR' ~/.zshrc 2>/dev/null; then
             echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.zshrc
             echo '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"' >> ~/.zshrc
           fi
           USERSCRIPT
           
-          # Verify openclaw installed
+          # openclaw のインストール確認
           OPENCLAW_MJS=$(find $USER_HOME/.nvm -path "*/node_modules/openclaw/openclaw.mjs" 2>/dev/null | head -1)
           NODE_BIN=$(find $USER_HOME/.nvm -name node -type f 2>/dev/null | head -1)
           if [ -z "$OPENCLAW_MJS" ] || [ -z "$NODE_BIN" ]; then
@@ -541,14 +541,14 @@ Resources:
           fi
           echo "openclaw found: $OPENCLAW_MJS"
           
-          # Configure AWS region
+          # AWS リージョンの設定
           echo "[5/9] Configuring AWS..."
           sudo -u $CURRENT_USER mkdir -p $USER_HOME/.aws
           sudo -u $CURRENT_USER bash -c "printf '[default]\nregion = %s\noutput = json\n' \"$AWS_REGION\" > $USER_HOME/.aws/config"
           chown -R $CURRENT_USER:staff $USER_HOME/.aws
           chmod 600 $USER_HOME/.aws/config
           
-          # Configure environment variables
+          # 環境変数の設定
           echo "[6/9] Configuring environment variables..."
           {
             echo "export AWS_REGION=$AWS_REGION"
@@ -558,16 +558,16 @@ Resources:
             echo "export OPENCLAW_USE_BEDROCK=true"
           } >> $USER_HOME/.zshrc
           
-          # Configure OpenClaw
+          # OpenClaw の設定
           echo "[7/9] Configuring OpenClaw..."
-          
-          # Create config directory
+
+          # 設定ディレクトリの作成
           sudo -u $CURRENT_USER mkdir -p $USER_HOME/.openclaw
           
-          # Generate Gateway Token
+          # ゲートウェイトークンの生成
           GATEWAY_TOKEN=$(openssl rand -hex 24)
-          
-          # Create Bedrock configuration file (write as ec2-user to ensure correct ownership)
+
+          # Bedrock 設定ファイルの作成 (正しい所有権のため ec2-user として書き込む)
           sudo -u $CURRENT_USER tee $USER_HOME/.openclaw/openclaw.json > /dev/null << 'JSONEOF'
           {
             "gateway": {
@@ -611,19 +611,19 @@ Resources:
           }
           JSONEOF
           
-          # Replace placeholders
+          # プレースホルダーの置換
           sed -i '' "s/GATEWAY_TOKEN_PLACEHOLDER/$GATEWAY_TOKEN/g" $USER_HOME/.openclaw/openclaw.json
           sed -i '' "s/REGION_PLACEHOLDER/$AWS_REGION/g" $USER_HOME/.openclaw/openclaw.json
           sed -i '' "s|MODEL_ID_PLACEHOLDER|${OpenClawModel}|g" $USER_HOME/.openclaw/openclaw.json
           
-          # Install and start OpenClaw gateway using launchd (macOS native)
+          # launchd (macOS ネイティブ) を使って OpenClaw ゲートウェイをインストールして起動
           echo "[8/9] Installing OpenClaw gateway service..."
           
-          # Build absolute paths for launchd (cannot rely on nvm in launchd env)
+          # launchd 向けの絶対パスを構築 (launchd 環境では nvm に依存できない)
           OPENCLAW_MJS_PATH=$(find $USER_HOME/.nvm -path "*/node_modules/openclaw/openclaw.mjs" 2>/dev/null | head -1)
           NODE_BIN_PATH=$(find $USER_HOME/.nvm -name node -type f 2>/dev/null | head -1)
           
-          # Write plist with absolute paths using echo (avoids heredoc YAML issues)
+          # echo で絶対パス付き plist を書き込む (heredoc による YAML の問題を回避)
           PLIST_FILE="/Library/LaunchDaemons/com.openclaw.gateway.plist"
           echo '<?xml version="1.0" encoding="UTF-8"?>' > $PLIST_FILE
           echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> $PLIST_FILE
@@ -645,33 +645,33 @@ Resources:
           echo '</dict></plist>' >> $PLIST_FILE
           
           launchctl load -w $PLIST_FILE || true
-          # Enable messaging channels
+          # メッセージングチャンネルの有効化
           echo "[8.5/9] Enabling messaging channels..."
           sudo -u $CURRENT_USER bash << 'CHANNELSCRIPT'
           export HOME=/Users/ec2-user
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
           
-          # Enable WhatsApp
+          # WhatsApp を有効化
           openclaw plugins enable whatsapp || echo "WhatsApp plugin enable failed"
-          
-          # Enable Telegram
+
+          # Telegram を有効化
           openclaw plugins enable telegram || echo "Telegram plugin enable failed"
           
-          # Enable Discord
+          # Discord を有効化
           openclaw plugins enable discord || echo "Discord plugin enable failed"
-          
-          # Enable Slack
+
+          # Slack を有効化
           openclaw plugins enable slack || echo "Slack plugin enable failed"
-          
-          # Enable iMessage
+
+          # iMessage を有効化
           openclaw plugins enable imessage || echo "iMessage plugin enable failed"
-          
-          # Enable Google Chat
+
+          # Google Chat を有効化
           openclaw plugins enable googlechat || echo "Google Chat plugin enable failed"
           CHANNELSCRIPT
           
-          # Wait for port 18789 to be ready
+          # ポート 18789 の準備完了を待機
           echo "Waiting for OpenClaw gateway to start..."
           for i in $(seq 1 30); do
             if lsof -i :18789 > /dev/null 2>&1; then
@@ -686,7 +686,7 @@ Resources:
             echo "WARNING: Gateway did not start within 60s, check /tmp/openclaw-gateway.err"
           fi
           
-          # Save token to SSM Parameter Store (encrypted, never written to disk)
+          # トークンを SSM パラメータストアに保存 (暗号化済み、ディスクには書き込まない)
           STACK_NAME="${AWS::StackName}"
           aws ssm put-parameter \
             --name "/openclaw/$STACK_NAME/gateway-token" \
@@ -696,11 +696,11 @@ Resources:
             --overwrite || echo "Failed to save token to SSM"
           unset GATEWAY_TOKEN
 
-          # Save instance info (non-secret metadata only)
+          # インスタンス情報の保存 (非機密メタデータのみ)
           echo "$INSTANCE_ID" > $USER_HOME/.openclaw/instance_id.txt
           echo "$AWS_REGION" > $USER_HOME/.openclaw/region.txt
 
-          # Create SSM access script (retrieves token from SSM at runtime — never stored on disk)
+          # SSM アクセススクリプトの作成 (実行時に SSM からトークンを取得 — ディスクには保存しない)
           cat > $USER_HOME/ssm-portforward.sh << 'SSMEOF'
           #!/bin/bash
           IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
@@ -729,16 +729,16 @@ Resources:
           chmod +x $USER_HOME/ssm-portforward.sh
           chown $CURRENT_USER:staff $USER_HOME/ssm-portforward.sh
 
-          # Complete
+          # 完了
           echo "[9/9] Complete!"
           echo "SUCCESS" > $USER_HOME/.openclaw/setup_status.txt
           echo "Setup completed: $(date)" >> $USER_HOME/.openclaw/setup_status.txt
           echo "Mac Instance Type: ${MacInstanceType}" >> $USER_HOME/.openclaw/setup_status.txt
 
-          # Signal CloudFormation (token NOT included — retrieve from SSM)
+          # CloudFormation へシグナル送信 (トークンは含まない — SSM から取得する)
           COMPLETE_MSG="OpenClaw ready. Retrieve token from SSM: aws ssm get-parameter --name /openclaw/$STACK_NAME/gateway-token --with-decryption --query Parameter.Value --output text --region $AWS_REGION"
 
-          # Use curl to signal (cfn-signal not available on macOS by default)
+          # curl でシグナルを送信 (macOS ではデフォルトで cfn-signal が使えない)
           SIGNAL_JSON="{\"Status\":\"SUCCESS\",\"Reason\":\"OpenClaw ready on Mac\",\"UniqueId\":\"openclaw-mac\",\"Data\":\"$COMPLETE_MSG\"}"
           curl -X PUT -H "Content-Type:" --data-binary "$SIGNAL_JSON" "${OpenClawWaitHandle}"
 

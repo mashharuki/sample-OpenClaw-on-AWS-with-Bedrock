@@ -24,7 +24,7 @@ Metadata:
           - AuthAgentChannelType
 
 # ===========================================================================
-# Parameters
+# パラメータ
 # ===========================================================================
 Parameters:
   OpenClawModel:
@@ -104,7 +104,7 @@ Parameters:
     Description: "Messaging channel used by Authorization_Agent to notify Human_Approver"
 
 # ===========================================================================
-# Conditions
+# 条件
 # ===========================================================================
 Conditions:
   CreateEndpoints: !Equals [!Ref CreateVPCEndpoints, "true"]
@@ -116,10 +116,10 @@ Conditions:
     - !Equals [!Select [0, !Split ['.', !Ref InstanceType]], 'm7g']
 
 # ===========================================================================
-# Resources
+# リソース
 # ===========================================================================
 Resources:
-  # ==================== Wait Condition ====================
+  # ==================== 待機条件 ====================
   OpenClawWaitHandle:
     Type: AWS::CloudFormation::WaitConditionHandle
 
@@ -131,7 +131,7 @@ Resources:
       Timeout: '900'
       Count: 1
 
-  # ==================== VPC and Network ====================
+  # ==================== VPC とネットワーク ====================
   OpenClawVPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -258,7 +258,7 @@ Resources:
       SecurityGroupIds:
         - !Ref VPCEndpointSecurityGroup
 
-  # ==================== IAM Roles ====================
+  # ==================== IAM ロール ====================
   OpenClawInstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -345,8 +345,8 @@ Resources:
       Roles:
         - !Ref OpenClawInstanceRole
 
-  # Role the Agent Container runs as inside AgentCore Runtime.
-  # Created here so the ARN is available as a CFN output before the Runtime is created manually.
+  # AgentCore ランタイム内でエージェントコンテナが実行するロール。
+  # ランタイムを手動作成する前に CFN の出力として ARN が使えるようここで作成。
   AgentContainerExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -364,9 +364,9 @@ Resources:
                 aws:SourceAccount: !Ref AWS::AccountId
               ArnLike:
                 aws:SourceArn: !Sub "arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:*"
-      # Least-privilege: no managed policies. All permissions are explicit below.
-      # BedrockAgentCoreFullAccess is intentionally NOT used — it grants
-      # create/delete/update Runtime permissions that the container does not need.
+      # 最小権限: マネージドポリシーなし。すべての権限を以下で明示的に指定。
+      # BedrockAgentCoreFullAccess は意図的に使用しない — それは
+      # コンテナが必要としない Runtime の作成/削除/更新権限を付与するため。
       Policies:
         - PolicyName: AgentCoreExecutionPolicy
           PolicyDocument:
@@ -437,7 +437,7 @@ Resources:
         - Key: Feature
           Value: multitenancy
 
-  # ==================== Security Group ====================
+  # ==================== セキュリティグループ ====================
   OpenClawSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -459,7 +459,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-sg"
 
-  # ==================== S3 Bucket for Tenant Workspaces ====================
+  # ==================== テナントワークスペース用 S3 バケット ====================
   TenantWorkspaceBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -483,7 +483,7 @@ Resources:
         - Key: Feature
           Value: multitenancy
 
-  # ==================== ECR Repository ====================
+  # ==================== ECR リポジトリ ====================
   MultitenancyEcrRepository:
     Type: AWS::ECR::Repository
     Properties:
@@ -517,7 +517,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-multitenancy-agent"
 
-  # ==================== SSM Parameters ====================
+  # ==================== SSM パラメータ ====================
   AuthAgentSystemPromptParam:
     Type: AWS::SSM::Parameter
     Properties:
@@ -560,7 +560,7 @@ Resources:
         Project: openclaw
         Feature: multitenancy
 
-  # ==================== CloudWatch Log Group ====================
+  # ==================== CloudWatch ロググループ ====================
   AgentLogsGroup:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -572,7 +572,7 @@ Resources:
         - Key: Feature
           Value: multitenancy
 
-  # ==================== EC2 Instance ====================
+  # ==================== EC2 インスタンス ====================
   OpenClawInstance:
     Type: AWS::EC2::Instance
     Properties:
@@ -623,7 +623,7 @@ Resources:
 
           snap start amazon-ssm-agent || systemctl start amazon-ssm-agent
 
-          # Install Docker via GPG-signed apt repo
+          # GPG 署名済み apt リポジトリで Docker をインストール
           install -m 0755 -d /etc/apt/keyrings
           curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
           chmod a+r /etc/apt/keyrings/docker.asc
@@ -637,7 +637,7 @@ Resources:
           sudo -u ubuntu bash << 'UBUNTU_SCRIPT'
           set -e
           cd ~
-          # Install NVM (download first, then execute)
+          # NVM のインストール (先にダウンロードしてから実行)
           NVM_VERSION="v0.40.1"
           for i in 1 2 3; do
             curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/${!NVM_VERSION}/install.sh" -o /tmp/nvm-install.sh && break
@@ -674,8 +674,8 @@ Resources:
           sudo -u ubuntu aws configure set output json || true
 
           STACK_NAME="${AWS::StackName}"
-          # NOTE: AgentCore Runtime ID is configured manually after pushing the container image.
-          # See README_AGENTCORE.md Phase 3 for instructions.
+          # 注意: AgentCore ランタイム ID はコンテナイメージをプッシュした後に手動で設定します。
+          # 手順は README_AGENTCORE.md フェーズ3を参照してください。
 
           cat >> /home/ubuntu/.bashrc << 'EOF'
           export AWS_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
@@ -787,15 +787,15 @@ Resources:
             --region $REGION \
             --overwrite || echo "Failed to save token to SSM"
 
-          # Save instance info (non-secret metadata only)
+          # インスタンス情報の保存 (非機密メタデータのみ)
           echo "$INSTANCE_ID" > /home/ubuntu/.openclaw/instance_id.txt
           echo "$REGION" > /home/ubuntu/.openclaw/region.txt
           chown ubuntu:ubuntu /home/ubuntu/.openclaw/*.txt
 
-          # Clear token from environment
+          # 環境変数からトークンを削除
           unset GATEWAY_TOKEN
 
-          # Create SSM access script (retrieves token from SSM at runtime — never stored on disk)
+          # SSM アクセススクリプトの作成 (実行時に SSM からトークンを取得 — ディスクには保存しない)
           cat > /home/ubuntu/ssm-portforward.sh << 'SSMEOF'
           #!/bin/bash
           IMDS_TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
@@ -845,7 +845,7 @@ Resources:
 
 
 # ===========================================================================
-# Outputs
+# 出力
 # ===========================================================================
 Outputs:
   Step1InstallSSMPlugin:

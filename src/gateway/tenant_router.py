@@ -1,16 +1,16 @@
 """
-Gateway Tenant Router — bridges OpenClaw Gateway and AgentCore Runtime.
+Gateway テナントルーター — OpenClaw Gateway と AgentCore Runtime を橋渡しする。
 
-Runs as an HTTP proxy on EC2 alongside the OpenClaw Gateway process.
-OpenClaw's webhook forwards incoming messages here; this module:
-  1. Derives a tenant_id from the channel + user identity
-  2. Invokes AgentCore Runtime with sessionId=tenant_id
-  3. Returns the agent response to OpenClaw for delivery
+EC2 上で OpenClaw Gateway プロセスと並行して HTTP プロキシとして動作する。
+OpenClaw の Webhook は受信メッセージをここに転送する。このモジュールは:
+  1. チャネルとユーザー ID から tenant_id を導出する
+  2. sessionId=tenant_id で AgentCore Runtime を呼び出す
+  3. エージェントのレスポンスを OpenClaw に返して配信する
 
-Design decisions:
-  - tenant_id format: {channel}__{user_id} (e.g. "wa__8613800138000")
-  - Stateless: all state lives in AgentCore Runtime sessions and SSM
-  - Graceful fallback: if AgentCore is unreachable, returns error (no local fallback)
+設計上の決定:
+  - tenant_id フォーマット: {channel}__{user_id} (例: "wa__8613800138000")
+  - ステートレス: すべての状態は AgentCore Runtime セッションと SSM に存在する
+  - グレースフルフォールバック: AgentCore に接続できない場合はエラーを返す (ローカルフォールバックなし)
 """
 
 import hashlib
@@ -33,10 +33,10 @@ AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 RUNTIME_ID = os.environ.get("AGENTCORE_RUNTIME_ID", "")
 ROUTER_PORT = int(os.environ.get("ROUTER_PORT", "8090"))
 
-# Tenant ID validation: alphanumeric, underscores, hyphens, dots
+# テナント ID のバリデーション: 英数字、アンダースコア、ハイフン、ドット
 _TENANT_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_.\-]{1,128}$")
 
-# Channel name normalization
+# チャネル名の正規化
 _CHANNEL_ALIASES = {
     "whatsapp": "wa",
     "telegram": "tg",
@@ -50,30 +50,30 @@ _CHANNEL_ALIASES = {
 
 
 # ---------------------------------------------------------------------------
-# Tenant ID derivation
+# テナント ID の導出
 # ---------------------------------------------------------------------------
 
 def derive_tenant_id(channel: str, user_id: str) -> str:
-    """Derive a stable, safe tenant_id from channel and user identity.
+    """チャネルとユーザー ID から安定した安全な tenant_id を導出する。
 
-    Format: {channel_short}__{sanitized_user_id}__{hash_suffix}
-    
-    AgentCore requires runtimeSessionId >= 33 chars, so we append a hash
-    suffix to guarantee minimum length while keeping the ID human-readable.
+    フォーマット: {channel_short}__{sanitized_user_id}__{hash_suffix}
 
-    Examples:
+    AgentCore は runtimeSessionId >= 33 文字を要求するため、ハッシュサフィックスを
+    追加して最小長を保証しながら人間が読みやすい ID を維持する。
+
+    例:
       - ("whatsapp", "8613800138000") → "wa__8613800138000__a1b2c3d4e5f6"
       - ("telegram", "123456789")     → "tg__123456789__f7e8d9c0b1a2"
     """
     channel_short = _CHANNEL_ALIASES.get(channel.lower(), channel.lower()[:4])
     sanitized = re.sub(r"[^a-zA-Z0-9_.\-]", "_", user_id.strip())
 
-    # Hash suffix ensures minimum 33 chars for AgentCore runtimeSessionId
-    # 19 hex chars ensures even short channel+user combos reach 33+ chars
+    # ハッシュサフィックスで AgentCore runtimeSessionId の最小 33 文字を保証
+    # 19 桁の hex で短い channel+user の組み合わせでも 33 文字以上になる
     hash_suffix = hashlib.sha256(f"{channel}:{user_id}".encode()).hexdigest()[:19]
     tenant_id = f"{channel_short}__{sanitized}__{hash_suffix}"
 
-    # Pad to 33 chars minimum if still too short
+    # 短い場合は最小 33 文字になるまでパディング
     while len(tenant_id) < 33:
         tenant_id += "0"
 
@@ -87,7 +87,7 @@ def derive_tenant_id(channel: str, user_id: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# AgentCore Runtime invocation
+# AgentCore Runtime の呼び出し
 # ---------------------------------------------------------------------------
 
 def _agentcore_client():
@@ -105,28 +105,28 @@ def invoke_agent_runtime(
     message: str,
     model: Optional[str] = None,
 ) -> dict:
-    """Invoke AgentCore Runtime with tenant isolation.
+    """テナント分離を用いて AgentCore Runtime を呼び出す。
 
-    In production: calls AgentCore Runtime API (Firecracker microVM per tenant).
-    In demo mode: calls local Agent Container directly (AGENT_CONTAINER_URL env var).
+    本番モード: AgentCore Runtime API を呼び出す (テナントごとに Firecracker microVM)。
+    デモモード: ローカルのエージェントコンテナを直接呼び出す (AGENT_CONTAINER_URL 環境変数)。
 
-    Args:
-        tenant_id: Derived tenant identifier, used as sessionId
-        message: User message text
-        model: Optional model override
+    引数:
+        tenant_id: 導出されたテナント識別子。sessionId として使用される
+        message: ユーザーメッセージテキスト
+        model: オプションのモデルオーバーライド
 
-    Returns:
-        Agent response dict with 'response' key
+    戻り値:
+        'response' キーを持つエージェントレスポンス辞書
 
-    Raises:
-        RuntimeError: If invocation fails
+    例外:
+        RuntimeError: 呼び出しに失敗した場合
     """
-    # Demo mode: call local Agent Container directly
+    # デモモード: ローカルのエージェントコンテナを直接呼び出す
     local_url = os.environ.get("AGENT_CONTAINER_URL")
     if local_url:
         return _invoke_local_container(local_url, tenant_id, message, model)
 
-    # Production mode: call AgentCore Runtime API
+    # 本番モード: AgentCore Runtime API を呼び出す
     if not RUNTIME_ID:
         raise RuntimeError(
             "AGENTCORE_RUNTIME_ID not configured. "
@@ -139,7 +139,7 @@ def invoke_agent_runtime(
 def _invoke_local_container(
     base_url: str, tenant_id: str, message: str, model: Optional[str]
 ) -> dict:
-    """Call a local Agent Container server.py directly (demo/testing mode)."""
+    """ローカルのエージェントコンテナ server.py を直接呼び出す (デモ/テストモード)。"""
     import requests
 
     payload = {
@@ -177,7 +177,7 @@ def _invoke_local_container(
 
 
 def _invoke_agentcore(tenant_id: str, message: str, model: Optional[str]) -> dict:
-    """Call AgentCore Runtime API (production mode)."""
+    """AgentCore Runtime API を呼び出す (本番モード)。"""
     import json as _json
 
     payload = {
@@ -187,10 +187,10 @@ def _invoke_agentcore(tenant_id: str, message: str, model: Optional[str]) -> dic
     if model:
         payload["model"] = model
 
-    # Get the Runtime ARN — construct from known pattern to avoid needing control plane permissions
+    # Runtime ARN を取得 — コントロールプレーン権限が不要なパターンから構築
     runtime_arn = os.environ.get("AGENTCORE_RUNTIME_ARN", "")
     if not runtime_arn:
-        # Construct ARN from runtime ID + region + account
+        # ランタイム ID + リージョン + アカウントから ARN を構築
         try:
             sts = boto3.client("sts", region_name=AWS_REGION)
             account_id = sts.get_caller_identity()["Account"]
@@ -211,7 +211,7 @@ def _invoke_agentcore(tenant_id: str, message: str, model: Optional[str]) -> dic
             payload=_json.dumps(payload).encode(),
         )
 
-        # Response body key is 'response' (StreamingBody), not 'body' or 'payload'
+        # レスポンスボディのキーは 'response' (StreamingBody)。'body' や 'payload' ではない
         result_bytes = response.get("response", response.get("payload", response.get("body", b"")))
         if hasattr(result_bytes, "read"):
             result_bytes = result_bytes.read()
@@ -238,16 +238,16 @@ def _invoke_agentcore(tenant_id: str, message: str, model: Optional[str]) -> dic
 
 
 # ---------------------------------------------------------------------------
-# HTTP server — receives webhooks from OpenClaw Gateway
+# HTTP サーバー — OpenClaw Gateway から Webhook を受信する
 # ---------------------------------------------------------------------------
 
 class TenantRouterHandler(BaseHTTPRequestHandler):
-    """HTTP handler for the tenant routing proxy.
+    """テナントルーティングプロキシ用の HTTP ハンドラー。
 
-    Endpoints:
-      GET  /health          → health check
-      POST /route           → route message to AgentCore Runtime
-      POST /route/broadcast → (future) broadcast to multiple tenants
+    エンドポイント:
+      GET  /health          → ヘルスチェック
+      POST /route           → AgentCore Runtime へメッセージをルーティング
+      POST /route/broadcast → (将来) 複数テナントへのブロードキャスト
     """
 
     def log_message(self, fmt, *args):
@@ -277,7 +277,7 @@ class TenantRouterHandler(BaseHTTPRequestHandler):
             self._respond(400, {"error": "invalid json"})
             return
 
-        # Extract routing fields
+        # ルーティングフィールドを抽出
         channel = payload.get("channel", "")
         user_id = payload.get("user_id", "")
         message = payload.get("message", "")
@@ -290,7 +290,7 @@ class TenantRouterHandler(BaseHTTPRequestHandler):
             self._respond(400, {"error": "message required"})
             return
 
-        # Derive tenant and route
+        # テナントを導出してルーティング
         try:
             tenant_id = derive_tenant_id(channel, user_id)
         except ValueError as e:
@@ -320,11 +320,11 @@ class TenantRouterHandler(BaseHTTPRequestHandler):
 
 
 # ---------------------------------------------------------------------------
-# Startup
+# 起動
 # ---------------------------------------------------------------------------
 
 def _load_runtime_id_from_ssm():
-    """Try to load AGENTCORE_RUNTIME_ID from SSM if not set in env."""
+    """環境変数に設定されていない場合、SSM から AGENTCORE_RUNTIME_ID の読み込みを試みる。"""
     global RUNTIME_ID
     if RUNTIME_ID:
         return
