@@ -85,6 +85,163 @@ aws cloudformation wait stack-create-complete \
 - **Instance**: t4g.medium (Graviton ARM, 20% cheaper than t3.medium)
 - **VPC Endpoints**: Enabled (private network, more secure)
 
+### Deployment via AWS CDK
+
+This repository also includes CDK projects for each stack under `cdks/`.
+
+Common prerequisites:
+
+- Bun 1.2 or later
+- AWS CLI configured for the target account and region
+- Sufficient IAM permissions for the target stack
+- `cdk bootstrap` is not required because these projects use `BootstraplessSynthesizer`
+
+Common workflow:
+
+```bash
+cd cdks/<project-name>
+bun install
+bun run build
+```
+
+#### 1. Linux single-user stack
+
+```bash
+cd cdks/clawdbot-bedrock
+bun install
+bun run build
+bun run cdk deploy ClawdbotBedrockStack \
+  --require-approval never \
+  --parameters KeyPairName=none \
+  --parameters AllowedSSHCIDR='' \
+  --parameters CreateVPCEndpoints=true
+```
+
+Destroy:
+
+```bash
+cd cdks/clawdbot-bedrock
+bun run cdk destroy ClawdbotBedrockStack --force
+```
+
+Note:
+
+- If `EnableDataProtection=true`, the retained EBS data volume is intentionally preserved and must be deleted manually if no longer needed.
+
+#### 2. AgentCore stack
+
+```bash
+cd cdks/clawdbot-bedrock-agentcore
+bun install
+bun run build
+bun run cdk deploy ClawdbotBedrockAgentcoreStack \
+  --require-approval never \
+  --parameters KeyPairName=your-keypair \
+  --parameters AllowedSSHCIDR=0.0.0.0/0 \
+  --parameters EnableAgentCore=true
+```
+
+Destroy:
+
+```bash
+cd cdks/clawdbot-bedrock-agentcore
+bun run cdk destroy ClawdbotBedrockAgentcoreStack --force
+```
+
+#### 3. Multi-tenant infrastructure stack
+
+```bash
+cd cdks/clawdbot-bedrock-agentcore-multitenancy
+bun install
+bun run build
+bun run cdk deploy ClawdbotBedrockAgentcoreMultitenancyStack \
+  --require-approval never \
+  --parameters KeyPairName='' \
+  --parameters MaxConcurrentTenants=50 \
+  --parameters AuthAgentChannelType=whatsapp
+```
+
+Destroy:
+
+```bash
+cd cdks/clawdbot-bedrock-agentcore-multitenancy
+bun run cdk destroy ClawdbotBedrockAgentcoreMultitenancyStack --force
+```
+
+Notes:
+
+- This stack deploys shared infrastructure only.
+- If you created the AgentCore runtime and endpoint separately after the deploy, delete those external resources before destroying the stack.
+- If S3 or ECR is not empty, remove tenant workspace objects and container images first, then run destroy again.
+
+#### 4. macOS stack
+
+```bash
+cd cdks/clawdbot-bedrock-mac
+bun install
+bun run build
+bun run cdk deploy ClawdbotBedrockMacStack \
+  --require-approval never \
+  --parameters MacAvailabilityZone=us-west-2b \
+  --parameters KeyPairName=none \
+  --parameters AllowedSSHCIDR=''
+```
+
+Destroy:
+
+```bash
+cd cdks/clawdbot-bedrock-mac
+bun run cdk destroy ClawdbotBedrockMacStack --force
+```
+
+Note:
+
+- Mac Dedicated Hosts have a 24-hour minimum billing period.
+
+#### 5. Static admin console hosting stack
+
+Deploy infrastructure:
+
+```bash
+cd cdks/deploy-static-site
+bun install
+bun run build
+bun run cdk deploy DeployStaticSiteStack --require-approval never
+```
+
+Upload the built frontend after deploy:
+
+```bash
+cd admin-console
+bun install
+bun run build
+
+BUCKET_NAME=$(aws cloudformation describe-stacks \
+  --stack-name DeployStaticSiteStack \
+  --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
+  --output text)
+
+aws s3 sync dist/ "s3://${BUCKET_NAME}" --delete
+```
+
+Destroy:
+
+```bash
+BUCKET_NAME=$(aws cloudformation describe-stacks \
+  --stack-name DeployStaticSiteStack \
+  --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
+  --output text)
+
+aws s3 rm "s3://${BUCKET_NAME}" --recursive
+
+cd cdks/deploy-static-site
+bun run cdk destroy DeployStaticSiteStack --force
+```
+
+Note:
+
+- The S3 bucket must be empty before the stack can be deleted.
+
 ## Accessing OpenClaw
 
 ### Step 1: Get Instance ID
@@ -290,6 +447,8 @@ aws cloudformation wait stack-delete-complete \
   --stack-name OpenClaw-bedrock \
   --region us-west-2
 ```
+
+For CDK-based cleanup, use the `bun run cdk destroy ... --force` commands shown above for each stack.
 
 ## Cost Optimization
 

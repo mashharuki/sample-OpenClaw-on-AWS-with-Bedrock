@@ -279,6 +279,185 @@ Telegram/WhatsApp message
 
 **[→ Full Multi-Tenant Guide](README_AGENTCORE.md)** · **[→ Demo Guide](demo/README.md)** · **[→ Roadmap](ROADMAP.md)**
 
+### Deploy with AWS CDK
+
+If you prefer CDK over the published CloudFormation launch links, this repository also includes CDK projects for each stack under `cdks/`.
+
+Prerequisites:
+
+- Bun 1.2 or later
+- AWS CLI configured for the target account and region
+- IAM permissions to create the resources used by each stack
+- No `cdk bootstrap` step is required for these stacks because they use `BootstraplessSynthesizer`
+
+Recommended workflow for every CDK project:
+
+```bash
+cd cdks/<project-name>
+bun install
+bun run build
+```
+
+#### 1. Linux single-user stack: `clawdbot-bedrock`
+
+Directory: `cdks/clawdbot-bedrock`
+
+Deploy:
+
+```bash
+cd cdks/clawdbot-bedrock
+bun install
+bun run build
+bun run cdk deploy ClawdbotBedrockStack \
+  --require-approval never \
+  --parameters KeyPairName=none \
+  --parameters AllowedSSHCIDR='' \
+  --parameters CreateVPCEndpoints=true
+```
+
+Cleanup:
+
+```bash
+cd cdks/clawdbot-bedrock
+bun run cdk destroy ClawdbotBedrockStack --force
+```
+
+Cleanup note:
+
+- If you deployed with `EnableDataProtection=true`, the retained EBS data volume is intentionally left behind and must be deleted manually if you no longer need it.
+
+#### 2. AgentCore stack: `clawdbot-bedrock-agentcore`
+
+Directory: `cdks/clawdbot-bedrock-agentcore`
+
+Deploy:
+
+```bash
+cd cdks/clawdbot-bedrock-agentcore
+bun install
+bun run build
+bun run cdk deploy ClawdbotBedrockAgentcoreStack \
+  --require-approval never \
+  --parameters KeyPairName=your-keypair \
+  --parameters AllowedSSHCIDR=0.0.0.0/0 \
+  --parameters EnableAgentCore=true
+```
+
+Cleanup:
+
+```bash
+cd cdks/clawdbot-bedrock-agentcore
+bun run cdk destroy ClawdbotBedrockAgentcoreStack --force
+```
+
+Cleanup note:
+
+- Destroying the stack removes the EC2, IAM, VPC, and AgentCore infrastructure created by this CDK app.
+
+#### 3. Multi-tenant infrastructure stack: `clawdbot-bedrock-agentcore-multitenancy`
+
+Directory: `cdks/clawdbot-bedrock-agentcore-multitenancy`
+
+Deploy:
+
+```bash
+cd cdks/clawdbot-bedrock-agentcore-multitenancy
+bun install
+bun run build
+bun run cdk deploy ClawdbotBedrockAgentcoreMultitenancyStack \
+  --require-approval never \
+  --parameters KeyPairName='' \
+  --parameters MaxConcurrentTenants=50 \
+  --parameters AuthAgentChannelType=whatsapp
+```
+
+Cleanup:
+
+```bash
+cd cdks/clawdbot-bedrock-agentcore-multitenancy
+bun run cdk destroy ClawdbotBedrockAgentcoreMultitenancyStack --force
+```
+
+Cleanup notes:
+
+- This CDK stack deploys the shared infrastructure only.
+- If you created the AgentCore runtime and endpoint separately afterward, delete those external resources before destroying the stack.
+- If stack deletion reports that the S3 bucket or ECR repository is not empty, remove the tenant workspace objects and container images first, then run `cdk destroy` again.
+
+#### 4. macOS stack: `clawdbot-bedrock-mac`
+
+Directory: `cdks/clawdbot-bedrock-mac`
+
+Deploy:
+
+```bash
+cd cdks/clawdbot-bedrock-mac
+bun install
+bun run build
+bun run cdk deploy ClawdbotBedrockMacStack \
+  --require-approval never \
+  --parameters MacAvailabilityZone=us-west-2b \
+  --parameters KeyPairName=none \
+  --parameters AllowedSSHCIDR=''
+```
+
+Cleanup:
+
+```bash
+cd cdks/clawdbot-bedrock-mac
+bun run cdk destroy ClawdbotBedrockMacStack --force
+```
+
+Cleanup note:
+
+- Mac Dedicated Hosts are billed with a 24-hour minimum allocation, so destroy the stack promptly when you are finished with macOS workflows.
+
+#### 5. Static admin console hosting stack: `deploy-static-site`
+
+Directory: `cdks/deploy-static-site`
+
+Deploy infrastructure:
+
+```bash
+cd cdks/deploy-static-site
+bun install
+bun run build
+bun run cdk deploy DeployStaticSiteStack --require-approval never
+```
+
+Upload the built frontend after the infrastructure deploy completes:
+
+```bash
+cd admin-console
+bun install
+bun run build
+
+BUCKET_NAME=$(aws cloudformation describe-stacks \
+  --stack-name DeployStaticSiteStack \
+  --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
+  --output text)
+
+aws s3 sync dist/ "s3://${BUCKET_NAME}" --delete
+```
+
+Cleanup:
+
+```bash
+BUCKET_NAME=$(aws cloudformation describe-stacks \
+  --stack-name DeployStaticSiteStack \
+  --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
+  --output text)
+
+aws s3 rm "s3://${BUCKET_NAME}" --recursive
+
+cd cdks/deploy-static-site
+bun run cdk destroy DeployStaticSiteStack --force
+```
+
+Cleanup note:
+
+- The bucket must be empty before CloudFormation can delete the static site stack.
+
 ### macOS (Apple Silicon) — For iOS/macOS Development
 
 | Type | Chip | RAM | Monthly |

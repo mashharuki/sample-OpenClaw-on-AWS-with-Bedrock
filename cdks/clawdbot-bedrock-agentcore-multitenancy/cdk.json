@@ -1,5 +1,6 @@
 {
   "app": "bunx ts-node --prefer-ts-exts bin/clawdbot-bedrock-agentcore-multitenancy.ts",
+  "pathMetadata": false,
   "watch": {
     "include": [
       "**"

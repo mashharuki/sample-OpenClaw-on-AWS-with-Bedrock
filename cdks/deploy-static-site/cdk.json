@@ -1,5 +1,6 @@
 {
   "app": "bunx ts-node --prefer-ts-exts bin/deploy-static-site.ts",
+  "pathMetadata": false,
   "watch": {
     "include": [
       "**"

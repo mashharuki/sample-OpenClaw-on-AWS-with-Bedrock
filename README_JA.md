@@ -280,6 +280,185 @@ Telegram/WhatsApp のメッセージ
 
 **[→ 完全なマルチテナントガイド](README_AGENTCORE.md)** · **[→ デモガイド](demo/README.md)** · **[→ ロードマップ](ROADMAP.md)**
 
+### AWS CDK でデプロイする
+
+公開済みの CloudFormation 起動リンクではなく CDK を使いたい場合は、このリポジトリの `cdks/` 配下に各スタック用の CDK プロジェクトがあります。
+
+前提条件:
+
+- Bun 1.2 以上
+- 対象アカウント / リージョンに対して設定済みの AWS CLI
+- 各スタックが作成するリソースに対する IAM 権限
+- これらのスタックは `BootstraplessSynthesizer` を使っているため、`cdk bootstrap` は不要
+
+各 CDK プロジェクト共通の基本手順:
+
+```bash
+cd cdks/<project-name>
+bun install
+bun run build
+```
+
+#### 1. Linux 単一ユーザー構成: `clawdbot-bedrock`
+
+ディレクトリ: `cdks/clawdbot-bedrock`
+
+デプロイ:
+
+```bash
+cd cdks/clawdbot-bedrock
+bun install
+bun run build
+bun run cdk deploy ClawdbotBedrockStack \
+  --require-approval never \
+  --parameters KeyPairName=none \
+  --parameters AllowedSSHCIDR='' \
+  --parameters CreateVPCEndpoints=true
+```
+
+クリーンアップ:
+
+```bash
+cd cdks/clawdbot-bedrock
+bun run cdk destroy ClawdbotBedrockStack --force
+```
+
+クリーンアップ時の注意:
+
+- `EnableDataProtection=true` でデプロイした場合、保持設定された EBS データボリュームは意図的に残ります。不要になったら手動削除してください。
+
+#### 2. AgentCore 構成: `clawdbot-bedrock-agentcore`
+
+ディレクトリ: `cdks/clawdbot-bedrock-agentcore`
+
+デプロイ:
+
+```bash
+cd cdks/clawdbot-bedrock-agentcore
+bun install
+bun run build
+bun run cdk deploy ClawdbotBedrockAgentcoreStack \
+  --require-approval never \
+  --parameters KeyPairName=your-keypair \
+  --parameters AllowedSSHCIDR=0.0.0.0/0 \
+  --parameters EnableAgentCore=true
+```
+
+クリーンアップ:
+
+```bash
+cd cdks/clawdbot-bedrock-agentcore
+bun run cdk destroy ClawdbotBedrockAgentcoreStack --force
+```
+
+クリーンアップ時の注意:
+
+- `cdk destroy` により、この CDK アプリが作成した EC2、IAM、VPC、および AgentCore 関連リソースが削除されます。
+
+#### 3. マルチテナント基盤構成: `clawdbot-bedrock-agentcore-multitenancy`
+
+ディレクトリ: `cdks/clawdbot-bedrock-agentcore-multitenancy`
+
+デプロイ:
+
+```bash
+cd cdks/clawdbot-bedrock-agentcore-multitenancy
+bun install
+bun run build
+bun run cdk deploy ClawdbotBedrockAgentcoreMultitenancyStack \
+  --require-approval never \
+  --parameters KeyPairName='' \
+  --parameters MaxConcurrentTenants=50 \
+  --parameters AuthAgentChannelType=whatsapp
+```
+
+クリーンアップ:
+
+```bash
+cd cdks/clawdbot-bedrock-agentcore-multitenancy
+bun run cdk destroy ClawdbotBedrockAgentcoreMultitenancyStack --force
+```
+
+クリーンアップ時の注意:
+
+- この CDK スタックがデプロイするのは共有インフラ部分のみです。
+- 後続で AgentCore Runtime と Endpoint を別途作成している場合は、先にそれらの外部リソースを削除してください。
+- スタック削除時に S3 バケットや ECR リポジトリが空ではないと報告された場合は、テナント workspace のオブジェクトやコンテナイメージを先に削除してから `cdk destroy` を再実行してください。
+
+#### 4. macOS 構成: `clawdbot-bedrock-mac`
+
+ディレクトリ: `cdks/clawdbot-bedrock-mac`
+
+デプロイ:
+
+```bash
+cd cdks/clawdbot-bedrock-mac
+bun install
+bun run build
+bun run cdk deploy ClawdbotBedrockMacStack \
+  --require-approval never \
+  --parameters MacAvailabilityZone=us-west-2b \
+  --parameters KeyPairName=none \
+  --parameters AllowedSSHCIDR=''
+```
+
+クリーンアップ:
+
+```bash
+cd cdks/clawdbot-bedrock-mac
+bun run cdk destroy ClawdbotBedrockMacStack --force
+```
+
+クリーンアップ時の注意:
+
+- Mac Dedicated Host は最低 24 時間課金のため、macOS ワークフローが終わったら早めにスタックを削除してください。
+
+#### 5. 静的 Admin Console ホスティング構成: `deploy-static-site`
+
+ディレクトリ: `cdks/deploy-static-site`
+
+まずインフラをデプロイ:
+
+```bash
+cd cdks/deploy-static-site
+bun install
+bun run build
+bun run cdk deploy DeployStaticSiteStack --require-approval never
+```
+
+インフラ作成後に、ビルド済みフロントエンドをアップロード:
+
+```bash
+cd admin-console
+bun install
+bun run build
+
+BUCKET_NAME=$(aws cloudformation describe-stacks \
+  --stack-name DeployStaticSiteStack \
+  --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
+  --output text)
+
+aws s3 sync dist/ "s3://${BUCKET_NAME}" --delete
+```
+
+クリーンアップ:
+
+```bash
+BUCKET_NAME=$(aws cloudformation describe-stacks \
+  --stack-name DeployStaticSiteStack \
+  --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
+  --output text)
+
+aws s3 rm "s3://${BUCKET_NAME}" --recursive
+
+cd cdks/deploy-static-site
+bun run cdk destroy DeployStaticSiteStack --force
+```
+
+クリーンアップ時の注意:
+
+- 静的サイト用の S3 バケットは空でないと CloudFormation が削除できません。
+
 ### macOS (Apple Silicon) — iOS/macOS 開発向け
 
 | Type | Chip | RAM | Monthly |
@@ -383,7 +562,7 @@ openclaw gateway status
 - **OpenClaw**: [GitHub Issues](https://github.com/openclaw/openclaw/issues) · [Discord](https://discord.gg/openclaw)
 - **AWS Bedrock**: [AWS re:Post](https://repost.aws/tags/bedrock)
 - [DeepWiki](https://deepwiki.com/mashharuki/sample-OpenClaw-on-AWS-with-Bedrock)
-- [DeepWikiによる解説]()
+- [DeepWikiによる解説](https://deepwiki.com/search/_277535f9-c734-4d6f-b68c-2e5b31f7e800)
 ---
 
 **Built with Kiro** 🦞

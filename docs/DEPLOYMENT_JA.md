@@ -85,6 +85,163 @@ aws cloudformation wait stack-create-complete \
 - **Instance**: t4g.medium（Graviton ARM。t3.medium より 20% 安価）
 - **VPC Endpoints**: 有効（プライベートネットワークでより安全）
 
+### AWS CDK によるデプロイ
+
+このリポジトリには、各スタックに対応する CDK プロジェクトも `cdks/` 配下に含まれています。
+
+共通の前提条件:
+
+- Bun 1.2 以上
+- 対象アカウント / リージョンに設定済みの AWS CLI
+- 対象スタックを作成できる十分な IAM 権限
+- これらのプロジェクトは `BootstraplessSynthesizer` を使っているため `cdk bootstrap` は不要
+
+共通の基本手順:
+
+```bash
+cd cdks/<project-name>
+bun install
+bun run build
+```
+
+#### 1. Linux 単一ユーザー構成
+
+```bash
+cd cdks/clawdbot-bedrock
+bun install
+bun run build
+bun run cdk deploy ClawdbotBedrockStack \
+  --require-approval never \
+  --parameters KeyPairName=none \
+  --parameters AllowedSSHCIDR='' \
+  --parameters CreateVPCEndpoints=true
+```
+
+削除:
+
+```bash
+cd cdks/clawdbot-bedrock
+bun run cdk destroy ClawdbotBedrockStack --force
+```
+
+注意点:
+
+- `EnableDataProtection=true` の場合、保持設定された EBS データボリュームは意図的に残るため、不要なら手動で削除してください。
+
+#### 2. AgentCore 構成
+
+```bash
+cd cdks/clawdbot-bedrock-agentcore
+bun install
+bun run build
+bun run cdk deploy ClawdbotBedrockAgentcoreStack \
+  --require-approval never \
+  --parameters KeyPairName=your-keypair \
+  --parameters AllowedSSHCIDR=0.0.0.0/0 \
+  --parameters EnableAgentCore=true
+```
+
+削除:
+
+```bash
+cd cdks/clawdbot-bedrock-agentcore
+bun run cdk destroy ClawdbotBedrockAgentcoreStack --force
+```
+
+#### 3. マルチテナント基盤構成
+
+```bash
+cd cdks/clawdbot-bedrock-agentcore-multitenancy
+bun install
+bun run build
+bun run cdk deploy ClawdbotBedrockAgentcoreMultitenancyStack \
+  --require-approval never \
+  --parameters KeyPairName='' \
+  --parameters MaxConcurrentTenants=50 \
+  --parameters AuthAgentChannelType=whatsapp
+```
+
+削除:
+
+```bash
+cd cdks/clawdbot-bedrock-agentcore-multitenancy
+bun run cdk destroy ClawdbotBedrockAgentcoreMultitenancyStack --force
+```
+
+注意点:
+
+- このスタックがデプロイするのは共有インフラ部分のみです。
+- デプロイ後に AgentCore Runtime や Endpoint を別途作成した場合は、それらの外部リソースを先に削除してください。
+- S3 や ECR が空でない場合は、テナント workspace のオブジェクトやコンテナイメージを削除してから再度 destroy を実行してください。
+
+#### 4. macOS 構成
+
+```bash
+cd cdks/clawdbot-bedrock-mac
+bun install
+bun run build
+bun run cdk deploy ClawdbotBedrockMacStack \
+  --require-approval never \
+  --parameters MacAvailabilityZone=us-west-2b \
+  --parameters KeyPairName=none \
+  --parameters AllowedSSHCIDR=''
+```
+
+削除:
+
+```bash
+cd cdks/clawdbot-bedrock-mac
+bun run cdk destroy ClawdbotBedrockMacStack --force
+```
+
+注意点:
+
+- Mac Dedicated Host は最低 24 時間課金です。
+
+#### 5. 静的 Admin Console ホスティング構成
+
+まずインフラをデプロイ:
+
+```bash
+cd cdks/deploy-static-site
+bun install
+bun run build
+bun run cdk deploy DeployStaticSiteStack --require-approval never
+```
+
+デプロイ後にビルド済みフロントエンドをアップロード:
+
+```bash
+cd admin-console
+bun install
+bun run build
+
+BUCKET_NAME=$(aws cloudformation describe-stacks \
+  --stack-name DeployStaticSiteStack \
+  --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
+  --output text)
+
+aws s3 sync dist/ "s3://${BUCKET_NAME}" --delete
+```
+
+削除:
+
+```bash
+BUCKET_NAME=$(aws cloudformation describe-stacks \
+  --stack-name DeployStaticSiteStack \
+  --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' \
+  --output text)
+
+aws s3 rm "s3://${BUCKET_NAME}" --recursive
+
+cd cdks/deploy-static-site
+bun run cdk destroy DeployStaticSiteStack --force
+```
+
+注意点:
+
+- 静的サイト用 S3 バケットは空でないと削除できません。
+
 ## OpenClaw へのアクセス
 
 ### Step 1: インスタンス ID を取得
@@ -290,6 +447,8 @@ aws cloudformation wait stack-delete-complete \
   --stack-name OpenClaw-bedrock \
   --region us-west-2
 ```
+
+CDK でデプロイした場合は、上記の各スタック向け `bun run cdk destroy ... --force` を使って削除してください。
 
 ## コスト最適化
 
