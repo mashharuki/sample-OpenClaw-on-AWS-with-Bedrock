@@ -2,7 +2,12 @@
 import { App } from 'aws-cdk-lib';
 import { ClawdbotBedrockAgentcoreStack } from '../lib/clawdbot-bedrock-agentcore-stack';
 
-const app = new App();
+const app = new App({
+  context: {
+    'aws:cdk:enable-path-metadata': false,
+  },
+  treeMetadata: false,
+});
 new ClawdbotBedrockAgentcoreStack(app, 'ClawdbotBedrockAgentcoreStack', {
   /* If you don't specify 'env', this stack will be environment-agnostic.
    * Account/Region-dependent features and context lookups will not work,

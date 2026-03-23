@@ -1,16 +1,17 @@
 import {
-  Aws,
-  CfnCondition,
-  CfnOutput,
-  CfnParameter,
-  CfnResource,
-  CfnTag,
-  CfnWaitCondition,
-  CfnWaitConditionHandle,
-  Fn,
-  Stack,
-  StackProps,
-  Token,
+    Aws,
+    BootstraplessSynthesizer,
+    CfnCondition,
+    CfnOutput,
+    CfnParameter,
+    CfnResource,
+    CfnTag,
+    CfnWaitCondition,
+    CfnWaitConditionHandle,
+    Fn,
+    Stack,
+    StackProps,
+    Token,
 } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -48,8 +49,13 @@ function nameTag(value: string): CfnTag[] {
 
 export class ClawdbotBedrockAgentcoreStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
-    super(scope, id, props);
+    super(scope, id, {
+      ...props,
+      analyticsReporting: false,
+      synthesizer: props?.synthesizer ?? new BootstraplessSynthesizer(),
+    });
 
+    this.templateOptions.templateFormatVersion = '2010-09-09';
     this.templateOptions.description = 'OpenClaw - Complete One-Click Deployment with AgentCore Runtime (Gateway + AgentCore + ECR)';
 
     const openClawModel = new CfnParameter(this, 'OpenClawModel', {

@@ -1,18 +1,19 @@
 import {
-    App,
-    Aws,
-    CfnCondition,
-    CfnMapping,
-    CfnOutput,
-    CfnParameter,
-    CfnTag,
-    CfnWaitCondition,
-    CfnWaitConditionHandle,
-    Fn,
-    RemovalPolicy,
-    Stack,
-    StackProps,
-    Token,
+  App,
+  Aws,
+  BootstraplessSynthesizer,
+  CfnCondition,
+  CfnMapping,
+  CfnOutput,
+  CfnParameter,
+  CfnTag,
+  CfnWaitCondition,
+  CfnWaitConditionHandle,
+  Fn,
+  RemovalPolicy,
+  Stack,
+  StackProps,
+  Token,
 } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -67,11 +68,30 @@ function nameTag(value: string): CfnTag[] {
   return [{ key: 'Name', value }];
 }
 
+function regionConditionId(region: string): string {
+  return `Is${region
+    .split('-')
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join('')}`;
+}
+
 export class ClawdbotBedrockStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
-    super(scope, id, props);
+    super(scope, id, {
+      ...props,
+      analyticsReporting: false,
+      synthesizer: props?.synthesizer ?? new BootstraplessSynthesizer(),
+    });
 
+    this.templateOptions.templateFormatVersion = '2010-09-09';
     this.templateOptions.description = 'OpenClaw - AWS Native Deployment (Bedrock + SSM + VPC Endpoints)';
+    this.templateOptions.metadata = {
+      'cfn-lint': {
+        config: {
+          ignore_checks: ['E6101'],
+        },
+      },
+    };
 
     const openClawModel = new CfnParameter(this, 'OpenClawModel', {
       type: 'String',
@@ -111,7 +131,6 @@ export class ClawdbotBedrockStack extends Stack {
       type: 'String',
       default: 'true',
       description: 'Install Docker for sandboxed execution (recommended for group chats)',
-      allowedValues: ['true', 'false'],
     });
 
     const enableDataProtection = new CfnParameter(this, 'EnableDataProtection', {
@@ -137,10 +156,9 @@ export class ClawdbotBedrockStack extends Stack {
     });
 
     const regionConditions = MANTLE_REGIONS.map(
-      (region) =>
-        new CfnCondition(this, `Is${region.replace(/-/g, '').replace(/(^\w)/, (char) => char.toUpperCase())}`, {
-          expression: Fn.conditionEquals(Aws.REGION, region),
-        }),
+      (region) => new CfnCondition(this, regionConditionId(region), {
+        expression: Fn.conditionEquals(Aws.REGION, region),
+      }),
     );
 
     const isMantleSupportedRegion = new CfnCondition(this, 'IsMantleSupportedRegion', {

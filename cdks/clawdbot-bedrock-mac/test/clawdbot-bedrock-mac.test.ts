@@ -1,17 +1,17 @@
-// import * as cdk from 'aws-cdk-lib/core';
-// import { Template } from 'aws-cdk-lib/assertions';
-// import * as ClawdbotBedrockMac from '../lib/clawdbot-bedrock-mac-stack';
+import { App } from 'aws-cdk-lib';
+import { Template } from 'aws-cdk-lib/assertions';
+import { ClawdbotBedrockMacStack } from '../lib/clawdbot-bedrock-mac-stack';
 
-// example test. To run these tests, uncomment this file along with the
-// example resource in lib/clawdbot-bedrock-mac-stack.ts
-test('SQS Queue Created', () => {
-//   const app = new cdk.App();
-//     // WHEN
-//   const stack = new ClawdbotBedrockMac.ClawdbotBedrockMacStack(app, 'MyTestStack');
-//     // THEN
-//   const template = Template.fromStack(stack);
+test('mac infrastructure resources are synthesized', () => {
+	const app = new App();
+	const stack = new ClawdbotBedrockMacStack(app, 'MyTestStack');
+	const template = Template.fromStack(stack);
 
-//   template.hasResourceProperties('AWS::SQS::Queue', {
-//     VisibilityTimeout: 300
-//   });
+	template.resourceCountIs('AWS::EC2::Host', 1);
+	template.resourceCountIs('AWS::EC2::VPC', 1);
+	template.resourceCountIs('AWS::EC2::Instance', 1);
+	template.hasOutput('DedicatedHostId', {});
+	template.hasResourceProperties('AWS::EC2::SecurityGroup', {
+		GroupDescription: 'OpenClaw Mac instance security group',
+	});
 });

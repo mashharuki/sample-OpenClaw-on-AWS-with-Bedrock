@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { App } from 'aws-cdk-lib';
-import { ClawdbotBedrockMacStack } from '../lib/clawdbot-bedrock-mac-stack';
+import { DeployStaticSiteStack } from '../lib/deploy-static-site-stack';
 
 const app = new App({
   context: {
@@ -9,7 +9,7 @@ const app = new App({
   treeMetadata: false,
 });
 
-new ClawdbotBedrockMacStack(app, 'ClawdbotBedrockMacStack', {
+new DeployStaticSiteStack(app, 'DeployStaticSiteStack', {
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
     region: process.env.CDK_DEFAULT_REGION,

@@ -1,17 +1,20 @@
-// import * as cdk from 'aws-cdk-lib/core';
-// import { Template } from 'aws-cdk-lib/assertions';
-// import * as ClawdbotBedrockAgentcoreMultitenancy from '../lib/clawdbot-bedrock-agentcore-multitenancy-stack';
+import { App } from 'aws-cdk-lib';
+import { Template } from 'aws-cdk-lib/assertions';
+import { ClawdbotBedrockAgentcoreMultitenancyStack } from '../lib/clawdbot-bedrock-agentcore-multitenancy-stack';
 
-// example test. To run these tests, uncomment this file along with the
-// example resource in lib/clawdbot-bedrock-agentcore-multitenancy-stack.ts
-test('SQS Queue Created', () => {
-//   const app = new cdk.App();
-//     // WHEN
-//   const stack = new ClawdbotBedrockAgentcoreMultitenancy.ClawdbotBedrockAgentcoreMultitenancyStack(app, 'MyTestStack');
-//     // THEN
-//   const template = Template.fromStack(stack);
+test('multitenancy infrastructure resources are synthesized', () => {
+	const app = new App();
+	const stack = new ClawdbotBedrockAgentcoreMultitenancyStack(app, 'MyTestStack');
+	const template = Template.fromStack(stack);
 
-//   template.hasResourceProperties('AWS::SQS::Queue', {
-//     VisibilityTimeout: 300
-//   });
+	template.resourceCountIs('AWS::EC2::VPC', 1);
+	template.resourceCountIs('AWS::ECR::Repository', 1);
+	template.resourceCountIs('AWS::S3::Bucket', 1);
+	template.resourceCountIs('AWS::EC2::Instance', 1);
+	template.hasResourceProperties('AWS::SSM::Parameter', {
+		Name: {
+			'Fn::Sub': '/openclaw/${AWS::StackName}/auth-agent/system-prompt',
+		},
+	});
+	template.hasOutput('MultitenancyEcrRepositoryUri', {});
 });
