@@ -34,6 +34,7 @@ const BEDROCK_MODELS = [
   'moonshotai.kimi-k2.5',
 ];
 
+// EC2インスタンスタイプ
 const INSTANCE_TYPES = [
   't4g.small',
   't4g.medium',
@@ -49,6 +50,7 @@ const INSTANCE_TYPES = [
   'c5.xlarge',
 ];
 
+// リージョン
 const MANTLE_REGIONS = [
   'us-east-1',
   'us-east-2',
@@ -64,10 +66,20 @@ const MANTLE_REGIONS = [
   'sa-east-1',
 ];
 
+/**
+ * NameTagを作成するメソッド
+ * @param value
+ * @returns
+ */
 function nameTag(value: string): CfnTag[] {
   return [{ key: 'Name', value }];
 }
 
+/**
+ * リージョン毎にConditionIdを作成するメソッド
+ * @param region
+ * @returns
+ */
 function regionConditionId(region: string): string {
   return `Is${region
     .split('-')
@@ -75,7 +87,17 @@ function regionConditionId(region: string): string {
     .join('')}`;
 }
 
+/**
+ * OpenClawをAWSにデプロイするためのSDKスタック
+ */
 export class ClawdbotBedrockStack extends Stack {
+
+  /**
+   * コンストラクター
+   * @param scope
+   * @param id
+   * @param props
+   */
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, {
       ...props,

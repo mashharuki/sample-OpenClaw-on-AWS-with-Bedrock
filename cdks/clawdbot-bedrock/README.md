@@ -155,7 +155,8 @@ bun run build
 bun run test
 bunx cdk synth
 bunx cdk diff
-bunx cdk deploy
+bunx cdk deploy --all
+bunx cdk destroy
 ```
 
 ## 補足
