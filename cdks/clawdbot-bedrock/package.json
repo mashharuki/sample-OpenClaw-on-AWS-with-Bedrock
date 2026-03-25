@@ -9,14 +9,16 @@
     "build": "bunx tsc",
     "watch": "bunx tsc -w",
     "test": "bunx jest",
-    "cdk": "bunx cdk"
+    "cdk": "bunx cdk",
+    "format": "bunx biome format --write ."
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.9",
     "@types/jest": "^29.5.14",
     "@types/node": "^24.10.1",
+    "aws-cdk": "2.1100.1",
     "jest": "^29.7.0",
     "ts-jest": "^29.2.5",
-    "aws-cdk": "2.1100.1",
     "ts-node": "^10.9.2",
     "typescript": "~5.9.3"
   },
