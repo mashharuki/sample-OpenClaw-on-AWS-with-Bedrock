@@ -9,24 +9,24 @@
 ## 機能一覧
 
 | 機能 | 説明 | 実装ポイント |
-| --- | --- | --- |
+|-----|------|-----------|
 | OpenClaw 単体デプロイ | Ubuntu 24.04 ベースの EC2 に OpenClaw を自動構築 | UserData で AWS CLI、SSM Agent、Docker、Node.js、OpenClaw を導入 |
 | ネットワーク自動作成 | 専用 VPC、パブリック/プライベートサブネット、IGW、ルートを作成 | Gateway はパブリックサブネット、VPC エンドポイントはプライベートサブネット |
 | Bedrock 私設接続 | Bedrock Runtime と条件付き Bedrock Mantle の Interface VPC Endpoint を作成 | `CreateVPCEndpoints=true` のときのみ作成 |
 | 管理アクセス最小化 | 通常運用は SSM Session Manager を前提にし、SSH は任意 | `AllowedSSHCIDR` と `KeyPairName` が揃った場合のみ 22 番を許可 |
 | データ保護 | OpenClaw 用の追加 EBS ボリュームをアタッチ | `EnableDataProtection=true` の場合は削除時も保持 |
 | サンドボックス実行 | Docker を利用した隔離実行を有効化可能 | `EnableSandbox=true` でインストール |
-| ARM/x86 自動切替 | インスタンスタイプに応じて Ubuntu AMI のアーキテクチャを切替 | SSM public parameter で最新 AMI を解決 |
+| ARM/x86 自動切替 | インスタンスタイプに応じて Ubuntu AMI のアーキテクチャを切替 | SSM Public Parameter で最新 AMI を解決 |
 
 ## 採用 AWS サービス
 
 | AWS サービス | このスタックでの役割 |
-| --- | --- |
-| AWS CDK / AWS CloudFormation | インフラ定義、デプロイ、出力値の生成 |
+|-----------|-----------------|
+| AWS CDK / CloudFormation | インフラ定義、デプロイ、出力値の生成 |
 | Amazon VPC | OpenClaw 用の専用ネットワークを提供 |
 | Amazon EC2 | OpenClaw Gateway 本体を実行 |
 | Amazon EBS | ルートボリュームと追加データボリュームを提供 |
-| AWS Identity and Access Management | EC2 インスタンスロールとインスタンスプロファイルを提供 |
+| AWS IAM | EC2 インスタンスロールとインスタンスプロファイルを提供 |
 | AWS Systems Manager | Session Manager による接続と Parameter Store のトークン保管に使用 |
 | Amazon Bedrock | OpenClaw の推論実行先 |
 | Amazon VPC Endpoint | Bedrock と SSM へのプライベート接続を提供 |
@@ -64,9 +64,9 @@ flowchart LR
 	VPC --> PrivateSubnet --> VPCE3
 ```
 
-## 機能別シーケンス図
+## シーケンス図
 
-### 1. 初回デプロイとブートストラップ
+### 初回デプロイとブートストラップ
 
 ```mermaid
 sequenceDiagram
@@ -87,7 +87,7 @@ sequenceDiagram
 	CFN-->>Operator: 出力値を返却
 ```
 
-### 2. 管理者アクセスと Gateway 利用
+### Gateway 利用フロー
 
 ```mermaid
 sequenceDiagram
@@ -102,7 +102,7 @@ sequenceDiagram
 	EC2-->>Operator: Gateway UI を返却
 ```
 
-### 3. OpenClaw の推論実行
+### OpenClaw 推論実行フロー
 
 ```mermaid
 sequenceDiagram
@@ -117,7 +117,7 @@ sequenceDiagram
 	EC2-->>User: 応答を返却
 ```
 
-### 4. データ保護付き削除フロー
+### データ保護付き削除フロー
 
 ```mermaid
 sequenceDiagram
@@ -138,7 +138,7 @@ sequenceDiagram
 ## 主要パラメータ
 
 | パラメータ | 用途 |
-| --- | --- |
+|----------|------|
 | `OpenClawModel` | 利用する Bedrock モデル ID |
 | `InstanceType` | EC2 インスタンスタイプ |
 | `CreateVPCEndpoints` | Bedrock/SSM 用 VPC エンドポイントを作成するか |
@@ -159,8 +159,35 @@ bunx cdk deploy --all
 bunx cdk destroy
 ```
 
+## 月額運用コスト
+
+- **EC2** (c7g.large): ~$20–40 （Graviton インスタンスは 20% 割安）
+- **EBS** (30GB): ~$2.40
+- **VPC Endpoints**: ~$29 ($0.01/時間 × 5 エンドポイント)
+- **Bedrock**: 従量課金
+- **合計**: ~$45–65/月
+
+> **注**: Graviton（ARM64）インスタンスは優れた単価性能比を提供します。
+
 ## 補足
 
-- Bedrock Mantle の VPC エンドポイントは対応リージョンでのみ作成されます。
-- SSH はあくまでフォールバック手段で、通常運用は Session Manager を前提にしています。
-- Data volume はルートディスクとは別にアタッチされるため、保持設定を使うと再デプロイ時のデータ再利用設計を組みやすくなります。
+- Bedrock Mantle の VPC エンドポイントは対応リージョンでのみ作成されます
+- SSH はあくまでフォールバック手段で、通常運用は Session Manager を前提にしています
+- Data volume はルートディスクとは別にアタッチされるため、保持設定を使うと再デプロイ時のデータ再利用設計を組みやすくなります
+
+## デプロイ後の操作方法
+
+1. SSMプラグインをインストールする
+2. ポートフォワーディングする.
+
+	```bash
+	aws ssm start-session --target i-08061dbee5eb820a1 --region ap-northeast-1 --document-name AWS-StartPortForwardingSession --parameters '{"portNumber":["18789"],"localPortNumber":["18789"]}'
+	```
+
+3. OpenClaw Gatewayアクセス用トークンを取得する
+
+	```bash
+	aws ssm get-parameter --name /openclaw/ClawdbotBedrockStack/gateway-token --with-decryption --query Parameter.Value --output text --region ap-northeast-1
+	```
+
+4. 接続したい各チャットとの接続方法をセットアップして呼び出す
