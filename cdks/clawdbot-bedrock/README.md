@@ -177,6 +177,31 @@ bunx cdk destroy
 
 ## デプロイ後の操作方法
 
+0. CDKスタックのデプロイに成功すると以下のような表記となる
+
+	```bash
+	✅  ClawdbotBedrockStack
+	✨  Deployment time: 381.51s
+
+	Outputs:
+	ClawdbotBedrockStack.BedrockModel = global.amazon.nova-2-lite-v1:0
+	ClawdbotBedrockStack.DataVolumeIdNotRetained = vol-<固有値>
+	ClawdbotBedrockStack.InstanceArchitecture = arm64
+	ClawdbotBedrockStack.InstanceId = i-<固有値>
+	ClawdbotBedrockStack.MonthlyCost = EC2 (c7g.large): ~$20-40 (Graviton instances 20% cheaper)
+	EBS (30GB): ~$2.40
+	VPC Endpoints: ~$29 ($0.01/hour x 5 endpoints)
+	Bedrock: Pay-per-use
+	Total: ~$45-65/month
+	Note: Graviton (ARM64) instances offer better price-performance ratio
+	ClawdbotBedrockStack.Step1InstallSSMPlugin = https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
+	ClawdbotBedrockStack.Step2PortForwarding = aws ssm start-session --target i-<固有値> --region ap-northeast-1 --document-name AWS-StartPortForwardingSession --parameters '{"portNumber":["18789"],"localPortNumber":["18789"]}'
+	ClawdbotBedrockStack.Step3GetToken = aws ssm get-parameter --name /openclaw/ClawdbotBedrockStack/gateway-token --with-decryption --query Parameter.Value --output text --region ap-northeast-1
+	ClawdbotBedrockStack.Step4StartChatting = Connect WhatsApp, Telegram, Discord. See README: https://github.com/aws-samples/sample-OpenClaw-on-AWS-with-Bedrock
+	Stack ARN:
+	arn:aws:cloudformation:ap-northeast-1:<固有値>:stack/ClawdbotBedrockStack/	<固有値>
+	```
+
 1. SSMプラグインをインストールする
 2. ポートフォワーディングする.
 
@@ -189,5 +214,7 @@ bunx cdk destroy
 	```bash
 	aws ssm get-parameter --name /openclaw/ClawdbotBedrockStack/gateway-token --with-decryption --query Parameter.Value --output text --region ap-northeast-1
 	```
+
+	[localhost:18789](http://localhost:18789)にアクセスする
 
 4. 接続したい各チャットとの接続方法をセットアップして呼び出す

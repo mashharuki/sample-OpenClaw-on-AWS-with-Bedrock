@@ -1,17 +1,17 @@
 import {
-    Aws,
-    BootstraplessSynthesizer,
-    CfnCondition,
-    CfnOutput,
-    CfnParameter,
-    CfnResource,
-    CfnTag,
-    CfnWaitCondition,
-    CfnWaitConditionHandle,
-    Fn,
-    Stack,
-    StackProps,
-    Token,
+  Aws,
+  BootstraplessSynthesizer,
+  CfnCondition,
+  CfnOutput,
+  CfnParameter,
+  CfnResource,
+  CfnTag,
+  CfnWaitCondition,
+  CfnWaitConditionHandle,
+  Fn,
+  Stack,
+  StackProps,
+  Token,
 } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -19,6 +19,7 @@ import { Construct } from 'constructs';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+// 使用可能なモデル一覧
 const BEDROCK_MODELS = [
   'global.amazon.nova-2-lite-v1:0',
   'global.anthropic.claude-sonnet-4-5-20250929-v1:0',
@@ -30,6 +31,7 @@ const BEDROCK_MODELS = [
   'us.meta.llama3-3-70b-instruct-v1:0',
 ];
 
+// 使用可能なインスタンスタイプ一覧
 const INSTANCE_TYPES = [
   't4g.small',
   't4g.medium',
@@ -43,11 +45,31 @@ const INSTANCE_TYPES = [
   'c5.xlarge',
 ];
 
+/**
+ * Nameタグを生成するユーティリティ関数
+ * @param value
+ * @returns
+ */
 function nameTag(value: string): CfnTag[] {
   return [{ key: 'Name', value }];
 }
 
+/**
+ * コンピューティング環境にBedrock AgentCoreを使用する完全なワンクリックデプロイメントを提供するCDKスタック
+ * - Gateway: EC2インスタンス上で動作するOpenClaw AIアシスタントのゲートウェイ
+ * - AgentCore Runtime: サーバーレスなエージェント実行環境（オプション）
+ * - ECR Repository: AgentCore用のコンテナイメージを格納するECRリポジトリ
+ *
+ * ユーザーはEC2インスタンスにSSMセッションマネージャーで接続し、ローカルでポートフォワーディングを設定してゲートウェイにアクセスします。
+ * これにより、ユーザーは安全にOpenClawを使用でき、必要に応じてAgentCore Runtimeも利用可能になります。
+ */
 export class ClawdbotBedrockAgentcoreStack extends Stack {
+  /**
+   * コンストラクター
+   * @param scope
+   * @param id
+   * @param props
+   */
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, {
       ...props,
@@ -58,6 +80,7 @@ export class ClawdbotBedrockAgentcoreStack extends Stack {
     this.templateOptions.templateFormatVersion = '2010-09-09';
     this.templateOptions.description = 'OpenClaw - Complete One-Click Deployment with AgentCore Runtime (Gateway + AgentCore + ECR)';
 
+    // パラメータ定義 (モデル名)
     const openClawModel = new CfnParameter(this, 'OpenClawModel', {
       type: 'String',
       default: 'global.amazon.nova-2-lite-v1:0',
@@ -65,6 +88,7 @@ export class ClawdbotBedrockAgentcoreStack extends Stack {
       allowedValues: BEDROCK_MODELS,
     });
 
+    // パラメータ定義 (インスタンスタイプ)
     const instanceType = new CfnParameter(this, 'InstanceType', {
       type: 'String',
       default: 'c7g.large',
@@ -72,17 +96,20 @@ export class ClawdbotBedrockAgentcoreStack extends Stack {
       allowedValues: INSTANCE_TYPES,
     });
 
+    // パラメータ定義 (SHHキーペア名 緊急用)
     const keyPairName = new CfnParameter(this, 'KeyPairName', {
       type: 'AWS::EC2::KeyPair::KeyName',
       description: 'EC2 key pair for emergency SSH access',
     });
 
+    // パラメータ定義 (許可済みCIDR)
     const allowedSshCidr = new CfnParameter(this, 'AllowedSSHCIDR', {
       type: 'String',
       default: '0.0.0.0/0',
       description: 'CIDR for SSH access (recommend SSM Session Manager, set to 127.0.0.1/32 to disable SSH)',
     });
 
+    // パラメータ定義 (VPCエンドポイントを作るかどうか)
     const createVpcEndpoints = new CfnParameter(this, 'CreateVPCEndpoints', {
       type: 'String',
       default: 'true',
@@ -90,6 +117,7 @@ export class ClawdbotBedrockAgentcoreStack extends Stack {
       allowedValues: ['true', 'false'],
     });
 
+    // パラメータ定義 (AgentCore Runtimeを有効にするかどうか)
     const enableAgentCore = new CfnParameter(this, 'EnableAgentCore', {
       type: 'String',
       default: 'true',
@@ -97,14 +125,17 @@ export class ClawdbotBedrockAgentcoreStack extends Stack {
       allowedValues: ['true', 'false'],
     });
 
+    // パラメータ定義 (スタック名)
     const createEndpoints = new CfnCondition(this, 'CreateEndpoints', {
       expression: Fn.conditionEquals(createVpcEndpoints.valueAsString, 'true'),
     });
 
+    // パラメータ定義 (SSHアクセスを許可するかどうか)
     const allowSsh = new CfnCondition(this, 'AllowSSH', {
       expression: Fn.conditionNot(Fn.conditionEquals(allowedSshCidr.valueAsString, '127.0.0.1/32')),
     });
 
+    // パラメータ定義 (Gravitonインスタンスを使用するかどうか)
     const useGraviton = new CfnCondition(this, 'UseGraviton', {
       expression: Fn.conditionOr(
         Fn.conditionEquals(Fn.select(0, Fn.split('.', instanceType.valueAsString)), 't4g'),
@@ -113,27 +144,29 @@ export class ClawdbotBedrockAgentcoreStack extends Stack {
       ),
     });
 
+    // パラメータ定義 (AgentCore Runtimeを有効にするかどうか)
     const agentCoreEnabled = new CfnCondition(this, 'AgentCoreEnabled', {
       expression: Fn.conditionEquals(enableAgentCore.valueAsString, 'true'),
     });
 
+    // ネットワーク構築
     const availabilityZone = Fn.select(0, Fn.getAzs(''));
     const waitHandle = new CfnWaitConditionHandle(this, 'OpenClawWaitHandle');
-
+    // VPCとサブネットを手動で定義して、エンドポイントやルートテーブルの設定を細かく制御できるようにする
     const vpc = new ec2.CfnVPC(this, 'OpenClawVPC', {
       cidrBlock: '10.0.0.0/16',
       enableDnsHostnames: true,
       enableDnsSupport: true,
       tags: nameTag(Fn.sub('${AWS::StackName}-vpc')),
     });
-
+    // インターネットゲートウェイの定義
     const internetGateway = new ec2.CfnInternetGateway(this, 'OpenClawInternetGateway');
-
+    // VPCにインターネットゲートウェイをアタッチ
     const attachGateway = new ec2.CfnVPCGatewayAttachment(this, 'AttachGateway', {
       vpcId: vpc.ref,
       internetGatewayId: internetGateway.ref,
     });
-
+    // パブリックサブネット
     const publicSubnet = new ec2.CfnSubnet(this, 'PublicSubnet', {
       vpcId: vpc.ref,
       cidrBlock: '10.0.1.0/24',
@@ -141,7 +174,7 @@ export class ClawdbotBedrockAgentcoreStack extends Stack {
       availabilityZone,
       tags: nameTag(Fn.sub('${AWS::StackName}-public-subnet')),
     });
-
+    // プライベートサブネット
     const privateSubnet = new ec2.CfnSubnet(this, 'PrivateSubnet', {
       vpcId: vpc.ref,
       cidrBlock: '10.0.2.0/24',
@@ -152,7 +185,7 @@ export class ClawdbotBedrockAgentcoreStack extends Stack {
     const publicRouteTable = new ec2.CfnRouteTable(this, 'PublicRouteTable', {
       vpcId: vpc.ref,
     });
-
+    // ルートテーブル定義
     const publicRoute = new ec2.CfnRoute(this, 'PublicRoute', {
       routeTableId: publicRouteTable.ref,
       destinationCidrBlock: '0.0.0.0/0',
@@ -164,7 +197,7 @@ export class ClawdbotBedrockAgentcoreStack extends Stack {
       subnetId: publicSubnet.ref,
       routeTableId: publicRouteTable.ref,
     });
-
+    // セキュリティグループ定義
     const securityGroup = new ec2.CfnSecurityGroup(this, 'OpenClawSecurityGroup', {
       groupDescription: 'OpenClaw instance security group',
       vpcId: vpc.ref,
@@ -172,6 +205,7 @@ export class ClawdbotBedrockAgentcoreStack extends Stack {
       tags: nameTag(Fn.sub('${AWS::StackName}-sg')),
     });
 
+    // SSHアクセスのセキュリティグループルール（条件付き）
     const sshIngress = new ec2.CfnSecurityGroupIngress(this, 'OpenClawSshIngress', {
       groupId: securityGroup.attrGroupId,
       ipProtocol: 'tcp',
@@ -216,6 +250,7 @@ export class ClawdbotBedrockAgentcoreStack extends Stack {
       endpoint.cfnOptions.condition = createEndpoints;
     }
 
+    // インスタンスに付与するIAMロール
     const instanceRole = new iam.CfnRole(this, 'OpenClawInstanceRole', {
       assumeRolePolicyDocument: {
         Version: '2012-10-17',
@@ -267,6 +302,7 @@ export class ClawdbotBedrockAgentcoreStack extends Stack {
       tags: nameTag(Fn.sub('${AWS::StackName}-instance-role')),
     });
 
+    // インスタンスに付与するIAMポリシー(Bedrock AgentCore へのアクセス制御)
     new iam.CfnPolicy(this, 'AgentCoreAccessPolicy', {
       policyName: 'AgentCoreAccessPolicy',
       roles: [instanceRole.ref],
@@ -286,6 +322,7 @@ export class ClawdbotBedrockAgentcoreStack extends Stack {
       },
     }).cfnOptions.condition = agentCoreEnabled;
 
+    // ECRに付与するAIMポリシー
     new iam.CfnPolicy(this, 'ECRAccessPolicy', {
       policyName: 'ECRAccessPolicy',
       roles: [instanceRole.ref],
@@ -310,6 +347,7 @@ export class ClawdbotBedrockAgentcoreStack extends Stack {
       roles: [instanceRole.ref],
     });
 
+    // Bedrock AgentCoreの実行権限　IAMロール
     const agentCoreExecutionRole = new iam.CfnRole(this, 'AgentCoreExecutionRole', {
       roleName: Fn.sub('${AWS::StackName}-agentcore-execution-role'),
       assumeRolePolicyDocument: {
@@ -372,6 +410,7 @@ export class ClawdbotBedrockAgentcoreStack extends Stack {
     });
     agentCoreExecutionRole.cfnOptions.condition = agentCoreEnabled;
 
+    // AgentCore Runtime リソースを用意
     const agentCoreRuntime = new CfnResource(this, 'AgentCoreRuntime', {
       type: 'AWS::BedrockAgentCore::Runtime',
       properties: {
@@ -393,6 +432,7 @@ export class ClawdbotBedrockAgentcoreStack extends Stack {
 
     const userDataTemplate = readFileSync(join(__dirname, '..', 'userdata', 'openclaw-agentcore-bootstrap.sh'), 'utf8');
 
+    // OpenClaw Gateway用のインスタンスを用意
     const instance = new ec2.CfnInstance(this, 'OpenClawInstance', {
       imageId: Token.asString(
         Fn.conditionIf(
@@ -435,6 +475,10 @@ export class ClawdbotBedrockAgentcoreStack extends Stack {
       count: 1,
     });
     waitCondition.addDependency(instance);
+
+    // =========================================================================================================
+    // 成果物
+    // =========================================================================================================
 
     new CfnOutput(this, 'Step1InstallSSMPlugin', {
       description: 'STEP 1: Install SSM Session Manager Plugin on your local computer',

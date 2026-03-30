@@ -1,0 +1,151 @@
+<mxfile host="65bd71144e">
+    <diagram id="clawdbot-bedrock" name="ClawdbotBedrockStack アーキテクチャ図">
+        <mxGraphModel dx="1810" dy="918" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" background="#ffffff" math="0" shadow="0" adaptiveColors="auto">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="legend" value="凡例&#xa;━━ 実線: 常時通信パス&#xa;- - 点線: VPCエンドポイント経由(オプション)&#xa;緑枠: パブリックサブネット&#xa;オレンジ枠: プライベートサブネット&#xa;赤枠: セキュリティグループ&#xa;青枠: VPC&#xa;(オプション): 条件付きリソース" style="text;html=0;strokeColor=#666666;fillColor=#f5f5f5;align=left;verticalAlign=top;spacingLeft=8;spacingTop=8;rounded=1;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="20" y="70" width="215" height="170" as="geometry"/>
+                </mxCell>
+                <mxCell id="user" value="" style="shape=mxgraph.aws4.user;fillColor=#232F3E;fontColor=#ffffff;strokeColor=none;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="440" width="60" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="inet" value="インターネット" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#232F3E;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;aspect=fixed;shape=mxgraph.aws4.internet;" parent="1" vertex="1">
+                    <mxGeometry x="140" y="455" width="60" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="vpc" value="VPC (10.0.0.0/16)" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_vpc;grStroke=0;verticalLabelPosition=top;verticalAlign=bottom;fillColor=#E6F3FB;strokeColor=#147EBA;fontStyle=1;fontSize=12;pointerEvents=0;" parent="1" vertex="1">
+                    <mxGeometry x="255" y="60" width="920" height="860" as="geometry"/>
+                </mxCell>
+                <mxCell id="igw" value="インターネット&#xa;ゲートウェイ" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;aspect=fixed;shape=mxgraph.aws4.internet_gateway;" parent="vpc" vertex="1">
+                    <mxGeometry x="18" y="375" width="60" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="pubsub" value="パブリックサブネット (10.0.1.0/24)" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_public_subnet;grStroke=0;verticalLabelPosition=top;verticalAlign=bottom;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;pointerEvents=0;" parent="vpc" vertex="1">
+                    <mxGeometry x="90" y="105" width="390" height="670" as="geometry"/>
+                </mxCell>
+                <mxCell id="ec2sg" value="セキュリティグループ OUT:全許可 / IN:SSH(条件付き)" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_security_group;grStroke=0;verticalLabelPosition=top;verticalAlign=bottom;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;pointerEvents=0;" parent="pubsub" vertex="1">
+                    <mxGeometry x="25" y="95" width="335" height="500" as="geometry"/>
+                </mxCell>
+                <mxCell id="ec2" value="EC2インスタンス&#xa;Ubuntu 24.04&#xa;c7g.large (Graviton3)&#xa;OpenClaw + Docker" style="sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ec2;" parent="ec2sg" vertex="1">
+                    <mxGeometry x="128" y="80" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="ebs1" value="EBSデータボリューム&#xa;30GB gp3 暗号化&#xa;(オプション: Retain)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#7AA116;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.elastic_block_store;" parent="ec2sg" vertex="1">
+                    <mxGeometry x="55" y="290" width="58" height="58" as="geometry"/>
+                </mxCell>
+                <mxCell id="ebs2" value="EBSデータボリューム&#xa;30GB gp3 暗号化&#xa;(デフォルト: Delete)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#7AA116;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.elastic_block_store;" parent="ec2sg" vertex="1">
+                    <mxGeometry x="205" y="290" width="58" height="58" as="geometry"/>
+                </mxCell>
+                <mxCell id="privsub" value="プライベートサブネット (10.0.2.0/24)" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_private_subnet;grStroke=0;verticalLabelPosition=top;verticalAlign=bottom;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=11;pointerEvents=0;" parent="vpc" vertex="1">
+                    <mxGeometry x="515" y="105" width="360" height="670" as="geometry"/>
+                </mxCell>
+                <mxCell id="vpce-sg-lbl" value="VPCエンドポイント用SG&#xa;EC2からHTTPS(443)のみ許可 (オプション)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" parent="privsub" vertex="1">
+                    <mxGeometry x="15" y="55" width="325" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="vpce1" value="Bedrock Runtime&#xa;VPCE (オプション)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;aspect=fixed;shape=mxgraph.aws4.endpoints;" parent="privsub" vertex="1">
+                    <mxGeometry x="150" y="125" width="60" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="vpce2" value="Bedrock Mantle&#xa;VPCE (オプション)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;aspect=fixed;shape=mxgraph.aws4.endpoints;" parent="privsub" vertex="1">
+                    <mxGeometry x="150" y="225" width="60" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="vpce3" value="SSM VPCE&#xa;(オプション)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;aspect=fixed;shape=mxgraph.aws4.endpoints;" parent="privsub" vertex="1">
+                    <mxGeometry x="150" y="325" width="60" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="vpce4" value="SSM Messages&#xa;VPCE (オプション)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;aspect=fixed;shape=mxgraph.aws4.endpoints;" parent="privsub" vertex="1">
+                    <mxGeometry x="150" y="420" width="60" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="vpce5" value="EC2 Messages&#xa;VPCE (オプション)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;aspect=fixed;shape=mxgraph.aws4.endpoints;" parent="privsub" vertex="1">
+                    <mxGeometry x="150" y="515" width="60" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="iam" value="IAMロール&#xa;SSMManagedInstanceCore&#xa;CloudWatchAgentServerPolicy&#xa;BedrockAccessPolicy&#xa;SSMParameterPolicy" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#DD344C;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=10;aspect=fixed;shape=mxgraph.aws4.role;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="290" width="78" height="44" as="geometry"/>
+                </mxCell>
+                <mxCell id="admin" value="" style="shape=mxgraph.aws4.user;fillColor=#232F3E;fontColor=#ffffff;strokeColor=none;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="680" width="60" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="bedrock" value="Amazon Bedrock&#xa;(AIモデル推論)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#01A88D;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;" parent="1" vertex="1">
+                    <mxGeometry x="1280" y="190" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="ssm" value="SSM Session Manager&#xa;(リモートアクセス)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.systems_manager_session_manager;" parent="1" vertex="1">
+                    <mxGeometry x="1280" y="430" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="cw" value="Amazon CloudWatch&#xa;(ログ・監視)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudwatch;" parent="1" vertex="1">
+                    <mxGeometry x="1280" y="620" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="ps" value="SSM Parameter Store&#xa;(ゲートウェイトークン)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.parameter_store;" parent="1" vertex="1">
+                    <mxGeometry x="1280" y="810" width="78" height="78" as="geometry"/>
+                </mxCell>
+                <mxCell id="e1" value="メッセージ通信" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="user" target="inet" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="inet" target="igw" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3" value="インターネット経由" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="igw" target="ec2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e4" value="AIモデル呼び出し" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="ec2" target="bedrock" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="537" y="80"/>
+                            <mxPoint x="1230" y="80"/>
+                            <mxPoint x="1230" y="229"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e5" value="ログ送信" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="ec2" target="cw" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1240" y="379"/>
+                            <mxPoint x="1240" y="659"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e6" value="ゲートウェイトークン保存/取得" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="ec2" target="ps" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1250" y="418"/>
+                            <mxPoint x="1250" y="849"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e7" value="VPCエンドポイント経由(オプション)" style="edgeStyle=orthogonalEdgeStyle;dashed=1;fontSize=10;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="ec2" target="vpce1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e8" value="SSM接続(オプション)" style="edgeStyle=orthogonalEdgeStyle;dashed=1;fontSize=10;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="ec2" target="vpce3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e9" value="" style="edgeStyle=orthogonalEdgeStyle;dashed=1;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;" parent="1" source="vpce1" target="bedrock" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e10" value="" style="edgeStyle=orthogonalEdgeStyle;dashed=1;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;" parent="1" source="vpce3" target="ssm" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e11" value="/dev/sdf" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;entryX=0;entryY=1;entryDx=0;entryDy=0;" parent="1" source="ebs1" target="ec2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e12" value="/dev/sdf" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;entryX=1;entryY=1;entryDx=0;entryDy=0;" parent="1" source="ebs2" target="ec2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e13" value="インスタンスプロファイル" style="edgeStyle=orthogonalEdgeStyle;dashed=1;fontSize=10;" parent="1" source="iam" target="ec2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e14" value="SSMポートフォワード(port 18789)" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;" parent="1" source="admin" target="ssm" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1260" y="715"/>
+                            <mxPoint x="1260" y="508"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e15" value="OpenClaw Gateway UI(port 18789)" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="ssm" target="ec2" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1220" y="469"/>
+                            <mxPoint x="1220" y="40"/>
+                            <mxPoint x="537" y="40"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
