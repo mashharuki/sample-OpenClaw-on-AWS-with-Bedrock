@@ -1,5 +1,7 @@
 # OpenClaw Bedrock CDK Stack
 
+> 2026.3.28のOpenClawじゃないと上手く動かないです。
+
 ## 概要
 
 このスタックは、OpenClaw を単一 EC2 インスタンス上にデプロイするための標準構成です。CDK から CloudFormation テンプレートを生成し、VPC、サブネット、EC2、IAM、VPC エンドポイント、EBS データボリュームをまとめて作成します。OpenClaw のセットアップは UserData で自動実行され、デプロイ後は Systems Manager のポートフォワーディング経由で Gateway UI にアクセスします。
@@ -218,3 +220,9 @@ bunx cdk destroy
 	[localhost:18789](http://localhost:18789)にアクセスする
 
 4. 接続したい各チャットとの接続方法をセットアップして呼び出す
+
+	- Discordの場合は以下のコマンドを実行
+
+		```bash
+		openclaw pairing approve telegram <固有のコード>
+		```
